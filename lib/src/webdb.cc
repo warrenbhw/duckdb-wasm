@@ -45,6 +45,7 @@
 #include "duckdb/web/config.h"
 #include "duckdb/web/csv_insert_options.h"
 #include "duckdb/web/environment.h"
+#include "duckdb/web/extensions/datadocs_extension.h"
 #include "duckdb/web/extensions/excel_extension.h"
 #include "duckdb/web/extensions/fts_extension.h"
 #include "duckdb/web/extensions/json_extension.h"
@@ -821,6 +822,9 @@ arrow::Status WebDB::Open(std::string_view args_json) {
 #endif
 #if defined(DUCKDB_JSON_EXTENSION)
         duckdb_web_json_init(db.get());
+#endif
+#if defined(DUCKDB_DATADOCS_EXTENSION)
+        duckdb_web_datadocs_init(db.get());
 #endif
         RegisterCustomExtensionOptions(db);
 
