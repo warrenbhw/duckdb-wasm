@@ -28,6 +28,7 @@ JS_FILTER=
 EXTENSION_CACHE_DIR="${ROOT_DIR}/.ccache/extension"
 EXCEL_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/excel"
 JSON_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/json"
+DATADOCS_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/datadocs"
 
 cpp_lib: lib_tests
 
@@ -229,6 +230,9 @@ ifeq (${DUCKDB_EXCEL}, 1)
 endif
 ifeq (${DUCKDB_JSON}, 1)
 	touch ${JSON_EXTENSION_CACHE_FILE}
+endif
+ifeq (${DUCKDB_DATADOCS}, 1)
+	touch ${DATADOCS_EXTENSION_CACHE_FILE}
 endif
 
 wrapped_wasm_caches:
