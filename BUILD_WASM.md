@@ -1,6 +1,6 @@
 # Installation
 
-## Prerequisites:
+## Prerequisites (Mac):
 
 ```sh
 brew install emscripten
