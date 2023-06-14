@@ -6,6 +6,7 @@
 brew install emscripten
 brew install rust
 brew install ccache
+brew install git-lfs
 ```
 
 ### Modify submodule duckdb
