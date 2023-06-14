@@ -1,4 +1,4 @@
-# Instantiation
+# Installation
 
 ## Prerequisites:
 
