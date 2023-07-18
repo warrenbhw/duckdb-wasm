@@ -15,6 +15,10 @@ endif()
 set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY")
 message("DUCKDB_CXX_FLAGS=${DUCKDB_CXX_FLAGS}")
 
+set(DUCKDB_EXTENSIONS "fts;excel;json;datadocs")
+# Escape semicolons in DUCKDB_EXTENSIONS before passing to ExternalProject_Add
+string(REPLACE ";" "$<SEMICOLON>" DUCKDB_EXTENSIONS_PACKED "${DUCKDB_EXTENSIONS}")
+
 ExternalProject_Add(
   duckdb_ep
   SOURCE_DIR "${DUCKDB_CORE_DIR}"
@@ -29,14 +33,10 @@ ExternalProject_Add(
              -DCMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}
              -DCMAKE_BUILD_TYPE=${DUCKDB_BUILD_TYPE}
              -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-             -DBUILD_PARQUET_EXTENSION=TRUE
-             -DBUILD_FTS_EXTENSION=TRUE
-             -DBUILD_EXCEL_EXTENSION=TRUE
-             -DBUILD_JSON_EXTENSION=TRUE
-             -DBUILD_DATADOCS_EXTENSION=TRUE
+             -DBUILD_EXTENSIONS=${DUCKDB_EXTENSIONS_PACKED}
+             -DSKIP_EXTENSIONS=jemalloc
              -DBUILD_SHELL=FALSE
              -DBUILD_UNITTESTS=FALSE
-             -DBUILD_JEMALLOC_EXTENSION=FALSE
              -DDISABLE_BUILTIN_EXTENSIONS=TRUE
   BUILD_BYPRODUCTS
     <INSTALL_DIR>/lib/libduckdb_re2.a
@@ -62,6 +62,8 @@ set(DUCKDB_SOURCE_DIR "${DUCKDB_CORE_DIR}")
 set(DUCKDB_INCLUDE_DIR "${install_dir}/include")
 set(DUCKDB_UTF8PROC_INCLUDE_DIR
     "${DUCKDB_SOURCE_DIR}/third_party/utf8proc/include")
+set(DUCKDB_RE2_INCLUDE_DIR
+    "${DUCKDB_SOURCE_DIR}/third_party/re2")
 set(DUCKDB_FMT_INCLUDE_DIR "${DUCKDB_SOURCE_DIR}/third_party/fmt/include")
 set(DUCKDB_LIBRARY_PATH "${install_dir}/lib/libduckdb_static.a")
 file(MAKE_DIRECTORY ${DUCKDB_INCLUDE_DIR})
@@ -87,6 +89,7 @@ target_include_directories(
   INTERFACE ${DUCKDB_INCLUDE_DIR}
   INTERFACE ${DUCKDB_FMT_INCLUDE_DIR}
   INTERFACE ${DUCKDB_UTF8PROC_INCLUDE_DIR}
+  INTERFACE ${DUCKDB_RE2_INCLUDE_DIR}
   INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/parquet
   INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/snappy
   INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/miniz

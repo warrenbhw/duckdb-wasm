@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS -std=c++17)
+set(ignoreMe "${DUCKDB_WASM_VERSION}")
 
 if(DUCKDUB_WASM_LOADABLE_EXTENSIONS)
   set(CMAKE_CXX_FLAGS "-std=c++17 -fPIC -DWASM_LOADABLE_EXTENSIONS=1")
@@ -183,7 +184,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Headers
 
-include_directories("${CMAKE_SOURCE_DIR}/include" "${DUCKDB_UTF8PROC_INCLUDE_DIR}")
+include_directories("${CMAKE_SOURCE_DIR}/include" "${DUCKDB_UTF8PROC_INCLUDE_DIR}" "${DUCKDB_RE2_INCLUDE_DIR}")
 
 # ---------------------------------------------------------------------------
 # Libraries
@@ -289,7 +290,6 @@ if(EMSCRIPTEN)
       -s MAXIMUM_MEMORY=4GB \
       -s MODULARIZE=1 \
       -s FILESYSTEM=0 \
-      -s EXPORT_ES6=1 \
       -s EXPORT_NAME='DuckDB' \
       -s EXPORTED_FUNCTIONS='[ \
           _main, \
