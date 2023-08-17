@@ -289,13 +289,11 @@ wasm_star: wasm_relsize wasm_relperf wasm_dev wasm_debug
 .PHONY: js_debug
 js_debug: build/bootstrap wasm yarn_install
 	yarn workspace @duckdb/duckdb-wasm build:debug
-	yarn workspace @duckdb/duckdb-wasm test
 
 # Build the duckdb library in release mode
 .PHONY: js_release
 js_release: yarn_install
 	yarn workspace @duckdb/duckdb-wasm build:release
-	yarn workspace @duckdb/duckdb-wasm test
 
 # Build the duckdb docs
 .PHONY: docs
@@ -305,6 +303,10 @@ docs: yarn_install
 # Run the duckdb javascript tests
 .PHONY: js_tests
 js_tests: js_debug build/data
+	yarn workspace @duckdb/duckdb-wasm test
+
+.PHONY: js_tests_release
+js_tests_release: js_release
 	yarn workspace @duckdb/duckdb-wasm test
 
 # Run the duckdb javascript tests in browser
@@ -346,7 +348,7 @@ app_start_corp:
 	yarn workspace @duckdb/duckdb-wasm-app start:corp
 
 .PHONY: app
-app: wasm wasmpack shell docs
+app: wasm wasmpack shell docs js_tests_release
 	yarn workspace @duckdb/duckdb-wasm-app build:release
 
 .PHONY: app_server
@@ -390,7 +392,7 @@ build/duckdb_shell:
 
 # Generate the compile commands for the language server
 .PHONY: compile_commands
-compile_commands: 
+compile_commands:
 	mkdir -p ${LIB_DEBUG_DIR}
 	cmake -S ${LIB_SOURCE_DIR} -B ${LIB_DEBUG_DIR} \
 		-DCMAKE_BUILD_TYPE=Debug \

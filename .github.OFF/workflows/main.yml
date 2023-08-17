@@ -1,6 +1,11 @@
 name: 'Main'
 on:
     push:
+      branches:
+        - '**'
+        - '!master'
+      tags:
+        - '**'
     pull_request:
     create:
         tags:
@@ -669,3 +674,249 @@ jobs:
                   git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
                   git fetch origin gh-pages
                   ./scripts/deploy_pages.sh
+
+            - name: Build @duckdb/benchmarks
+              shell: bash
+              run: |
+                rm -r packages/duckdb-wasm/node_modules/*
+                yarn workspace @duckdb/benchmarks build
+                yarn workspace @duckdb/benchmarks bench:system:sort:int
+                yarn workspace @duckdb/benchmarks bench:system:join:2
+                yarn workspace @duckdb/benchmarks bench:system:join:3
+                yarn workspace @duckdb/benchmarks bench:system:regex
+                yarn workspace @duckdb/benchmarks bench:system:sum:int
+                yarn workspace @duckdb/benchmarks bench:system:sum:csv
+
+            - name: Upload reports
+              uses: actions/upload-artifact@v3
+              with:
+                  name: reports_micro
+                  path: |
+                      ./reports/benchmark_system_sort_int.json
+                      ./reports/benchmark_system_join_2.json
+                      ./reports/benchmark_system_join_3.json
+                      ./reports/benchmark_system_regex.json
+                      ./reports/benchmark_system_sum_csv.json
+                      ./reports/benchmark_system_sum_int.json
+                  retention-days: 1
+
+            - name: Preparation TPCH 0.01
+              if: github.ref == 'refs/heads/master'
+              uses: duckdb/duckdb-wasm-ci-env@v0.11
+              with:
+                  script: |-
+                      git config --global --add safe.directory '*'
+                      mkdir -p ./lib/build/wasm/release ./reports
+                      yarn install --frozen-lockfile
+                      ./scripts/generate_tpch_tbl.sh 0.01
+                      ./scripts/generate_tpch_arrow.sh 0.01
+                      ./scripts/generate_tpch_duckdb.sh 0.01
+                      ./scripts/generate_tpch_sqlite.sh 0.01
+
+            - name: Benchmarks TPCH 0.01
+              if: github.ref == 'refs/heads/master'
+              shell: bash
+              run: |
+                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.01
+                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.01
+                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.01
+                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.01
+
+            - name: Upload reports TPCH 0.01
+              if: github.ref == 'refs/heads/master'
+              uses: actions/upload-artifact@v3
+              with:
+                  name: reports_tpch_0_01
+                  path: |
+                      ./reports/benchmark_system_tpch_001_duckdb.json
+                      ./reports/benchmark_system_tpch_001_sqljs.json
+                      ./reports/benchmark_system_tpch_001_arquero.json
+                      ./reports/benchmark_system_tpch_001_lovefield.json
+                  retention-days: 1
+
+            - name: Preparation TPCH 0.1
+              if: github.ref == 'refs/heads/master'
+              uses: duckdb/duckdb-wasm-ci-env@v0.11
+              with:
+                  script: |-
+                      git config --global --add safe.directory '*'
+                      mkdir -p ./lib/build/wasm/release ./reports
+                      yarn install --frozen-lockfile
+                      ./scripts/generate_tpch_tbl.sh 0.1
+                      ./scripts/generate_tpch_arrow.sh 0.1
+                      ./scripts/generate_tpch_duckdb.sh 0.1
+                      ./scripts/generate_tpch_sqlite.sh 0.1
+
+            - name: Benchmarks TPCH 0.1
+              if: github.ref == 'refs/heads/master'
+              shell: bash
+              run: |
+                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.1
+                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.1
+                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.1
+                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.1
+
+            - name: Upload reports TPCH 0.1
+              if: github.ref == 'refs/heads/master'
+              uses: actions/upload-artifact@v3
+              with:
+                  name: reports_tpch_0_1
+                  path: |
+                      ./reports/benchmark_system_tpch_01_duckdb.json
+                      ./reports/benchmark_system_tpch_01_sqljs.json
+                      ./reports/benchmark_system_tpch_01_arquero.json
+                      ./reports/benchmark_system_tpch_01_lovefield.json
+                  retention-days: 1
+
+            - name: Preparation TPCH 0.25
+              if: github.ref == 'refs/heads/master'
+              uses: duckdb/duckdb-wasm-ci-env@v0.11
+              with:
+                  script: |-
+                      git config --global --add safe.directory '*'
+                      mkdir -p ./lib/build/wasm/release ./reports
+                      yarn install --frozen-lockfile
+                      ./scripts/generate_tpch_tbl.sh 0.25
+                      ./scripts/generate_tpch_arrow.sh 0.25
+                      ./scripts/generate_tpch_duckdb.sh 0.25
+                      ./scripts/generate_tpch_sqlite.sh 0.25
+
+            - name: Benchmarks TPCH 0.25
+              if: github.ref == 'refs/heads/master'
+              shell: bash
+              run: |
+                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.25
+                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.25
+                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.25
+                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.25
+
+            - name: Upload reports TPCH 0.25
+              if: github.ref == 'refs/heads/master'
+              uses: actions/upload-artifact@v3
+              with:
+                  name: reports_tpch_0_25
+                  path: |
+                      ./reports/benchmark_system_tpch_025_duckdb.json
+                      ./reports/benchmark_system_tpch_025_sqljs.json
+                      ./reports/benchmark_system_tpch_025_arquero.json
+                      ./reports/benchmark_system_tpch_025_lovefield.json
+                  retention-days: 1
+
+            - name: Preparation TPCH 0.5
+              if: github.ref == 'refs/heads/master'
+              uses: duckdb/duckdb-wasm-ci-env@v0.11
+              with:
+                  script: |-
+                      git config --global --add safe.directory '*'
+                      mkdir -p ./lib/build/wasm/release ./reports
+                      yarn install --frozen-lockfile
+                      ./scripts/generate_tpch_tbl.sh 0.5
+                      ./scripts/generate_tpch_arrow.sh 0.5
+                      ./scripts/generate_tpch_duckdb.sh 0.5
+                      ./scripts/generate_tpch_sqlite.sh 0.5
+
+            - name: Benchmarks TPCH 0.5
+              if: github.ref == 'refs/heads/master'
+              shell: bash
+              run: |
+                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.5
+                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.5
+                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.5
+                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.5
+
+            - name: Upload reports TPCH 0.5
+              if: github.ref == 'refs/heads/master'
+              uses: actions/upload-artifact@v3
+              with:
+                  name: reports_tpch_0_5
+                  path: |
+                      ./reports/benchmark_system_tpch_05_duckdb.json
+                      ./reports/benchmark_system_tpch_05_sqljs.json
+                      ./reports/benchmark_system_tpch_05_arquero.json
+                      ./reports/benchmark_system_tpch_05_lovefield.json
+                  retention-days: 1
+
+    merge_reports:
+        name: Merge benchmark reports
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/master'
+        needs:
+            - js_libs
+        steps:
+            - uses: actions/checkout@v3
+              with:
+                  submodules: 'recursive'
+
+            - uses: actions/download-artifact@v3
+              with:
+                  name: dataprep
+                  path: ./target/release/
+
+            - uses: actions/download-artifact@v3
+              with:
+                  name: reports_micro
+                  path: ./reports/
+
+            - uses: actions/download-artifact@v3
+              with:
+                  name: reports_tpch_0_01
+                  path: ./reports/
+
+            - uses: actions/download-artifact@v3
+              with:
+                  name: reports_tpch_0_1
+                  path: ./reports/
+
+            - uses: actions/download-artifact@v3
+              with:
+                  name: reports_tpch_0_25
+                  path: ./reports/
+
+            - uses: actions/download-artifact@v3
+              with:
+                  name: reports_tpch_0_5
+                  path: ./reports/
+
+            - name: Merge reports
+              shell: bash
+              run: |
+                mkdir duckdb
+                cd duckdb
+                wget https://github.com/duckdb/duckdb/releases/download/v0.8.1/duckdb_cli-linux-amd64.zip
+                unzip duckdb_cli-linux-amd64.zip
+                ./duckdb -c "COPY (FROM read_json_auto('../reports/*.json', union_by_name=1)) TO 'benchmarks.json'"
+                ./duckdb -c "COPY (FROM read_json_auto('../reports/*.json', union_by_name=1)) TO 'benchmarks.csv'"
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: reports_various
+                  path: |
+                      ./reports/benchmarks.arrow
+                      ./duckdb/benchmarks.json
+                      ./duckdb/benchmarks.csv
+                  retention-days: 1
+
+            - name: Merge benchmark reports
+              uses: duckdb/duckdb-wasm-ci-env@v0.11
+              with:
+                  script: |-
+                      chmod +x ./target/release/dataprep
+                      ./target/release/dataprep merge-benchmarks -r ./reports/
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: reports_all
+                  path: |
+                      ./reports/benchmarks.arrow
+                  retention-days: 1
+
+            - name: Deploy benchmark reports
+              if: github.ref == 'refs/heads/master'
+              run: |
+                  git config --global user.name 'github-actions[bot]'
+                  git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+                  git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
+                  git fetch origin gh-pages
+                  ./scripts/deploy_benchmarks.sh
