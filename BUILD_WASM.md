@@ -123,5 +123,6 @@ duckdb-browser-eh.worker.63dcc272ecdd5657c10a.js:1 RuntimeError: unreachable
     at 04ce4786:0x66ab48
     at 04ce4786:0xc05e5
 ```
+---
 
-## Shut down the machine when you are finished as it's a large machine.
+**Finally, Please Shut Down the VM when you are finished using it, as it's a large machine.**
