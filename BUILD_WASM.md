@@ -1,6 +1,8 @@
 # BUILDING DUCKDB-WASM ON GCP
 
-View the video here to see the entire workflow of how these commands and actions are done. For a brand new machine, it takes about 25m to build everything. On an existing machine with the prerequisites installed it should take 10m or less.
+View the video here to see the entire workflow of how these commands and steps are done: https://youtu.be/yBhYkIRuoWQ.
+
+For a brand new machine, it takes about 25m to build everything. On an existing machine with the prerequisites installed it should take 10m or less.
 ​
 ## Starting VM
 The VM is currently Boot Disk: Ubuntu 20.04, 40GB SSD | Machine type: e2-standard-8 (4 cores) | Network tags: http-server, https-server, duckdb-wasm. 
