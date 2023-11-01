@@ -1,5 +1,6 @@
 export * from '../bindings/config';
 export * from '../bindings/tokens';
+export * from '../bindings/opfs';
 export * from '../log';
 export * from '../status';
 export * from '../parallel';

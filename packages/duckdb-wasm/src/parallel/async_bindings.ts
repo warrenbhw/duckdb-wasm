@@ -527,9 +527,9 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     }
 
     /** Register a file handle. */
-    public async registerFileHandle<HandleType>(
+    public async registerFileHandle(
         name: string,
-        handle: HandleType,
+        handle: any,
         protocol: DuckDBDataProtocol,
         directIO: boolean,
     ): Promise<void> {
