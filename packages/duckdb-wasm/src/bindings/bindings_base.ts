@@ -5,7 +5,9 @@ import { InstantiationProgress } from './progress';
 import { DuckDBBindings } from './bindings_interface';
 import { DuckDBConnection } from './connection';
 import { StatusCode } from '../status';
-import { dropResponseBuffers, DuckDBRuntime, readString, callSRet, copyBuffer, DuckDBDataProtocol } from './runtime';
+import { dropResponseBuffers, readString, callSRet, copyBuffer, DuckDBDataProtocol } from './runtime';
+import type { DuckDBRuntime } from "./runtime";
+import { OPFSFileHandle, defaultOPFSProtocol } from './opfs';
 import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from './insert_options';
 import { ScriptTokens } from './tokens';
 import { FileStatistics } from './file_stats';
@@ -444,23 +446,45 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         dropResponseBuffers(this.mod);
     }
     /** Register a file object URL */
-    public registerFileHandle<HandleType>(
+    public async registerFileHandle<HandleType>(
         name: string,
         handle: HandleType,
         protocol: DuckDBDataProtocol,
         directIO: boolean,
-    ): void {
+    ): Promise<void> {
+        let fileURL = name;
+        // Normalize the name and URL for OPFS file handle
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
+            name = name.replace(/^\/?/, '/');
+            const opfsHandle: OPFSFileHandle = handle as any;
+            if (!opfsHandle?.dirPath || !opfsHandle.fileName) throw new Error(`Invalid OPFS file handle for "${name}"`);
+            const dirPath = opfsHandle.dirPath.replace(/\/?$/, '/').replace(/^\/?/, '/');
+            fileURL = `${defaultOPFSProtocol}//${dirPath}${opfsHandle.fileName}`;
+            console.log(fileURL);
+        }
         const [s, d, n] = callSRet(
             this.mod,
             'duckdb_web_fs_register_file_url',
             ['string', 'string', 'number', 'boolean'],
-            [name, name, protocol, directIO],
+            [name, fileURL, protocol, directIO],
         );
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
         dropResponseBuffers(this.mod);
         globalThis.DUCKDB_RUNTIME._files = (globalThis.DUCKDB_RUNTIME._files || new Map()).set(name, handle);
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
+            const opfsHandle: OPFSFileHandle = handle as any;
+            const { fileHandle } = opfsHandle;
+            if (fileHandle) {
+                if (!opfsHandle.accessHandle) {
+                    opfsHandle.accessHandle = await fileHandle.createSyncAccessHandle();
+                    console.debug(`prepared SyncAccessHandle for OPFS file "${name}"`);
+                }
+            } else {
+                console.warn(`Invalid file handle for OPFS file "${name}"`);
+            }
+        }
         if (this.pthread) {
             for (const worker of this.pthread.runningWorkers) {
                 worker.postMessage({
