@@ -43,6 +43,9 @@ export enum DuckDBDataProtocol {
     HTTP = 4,
     S3 = 5,
 }
+export function getDataProtocolName(protocol?: number | string) {
+    return (typeof protocol === 'number' && DuckDBDataProtocol[protocol]) || String(protocol);
+}
 
 /** File flags for opening files*/
 export enum FileFlags {
@@ -58,6 +61,20 @@ export enum FileFlags {
     FILE_FLAGS_FILE_CREATE_NEW = 1 << 4,
     //! Open file in append mode
     FILE_FLAGS_APPEND = 1 << 5,
+}
+
+/**
+ * The result type of openFile function.
+ * from C++ source file: lib/src/io/web_filesystem.cc
+ */
+export class OpenedFile {
+    constructor(readonly fileSize: number, readonly fileBuffer: number) {}
+    getCppPointer(mod: EmscriptenModule) {
+        const ptr = mod._malloc(2 * 8); // 2 double variables
+        mod.HEAPF64[(ptr >> 3) + 0] = this.fileSize; // the first double is file_size
+        mod.HEAPF64[(ptr >> 3) + 0] = this.fileBuffer; // the second double is file_buffer
+        return ptr;
+    }
 }
 
 /** Configuration for the AWS S3 Filesystem */
@@ -121,6 +138,7 @@ export function dropResponseBuffers(mod: DuckDBModule): void {
 
 /** The duckdb runtime */
 export interface DuckDBRuntime {
+    /** Mapping from file path to file handle */
     _files?: Map<string, any>;
     _udfFunctions: Map<number, UDFFunction>;
 
@@ -130,6 +148,8 @@ export interface DuckDBRuntime {
     // File APIs with dedicated file identifier
     getDefaultDataProtocol(mod: DuckDBModule): number;
     openFile(mod: DuckDBModule, fileId: number, flags: FileFlags): void;
+    openFileAsync?(mod: DuckDBModule, fileId: number, flags: FileFlags): Promise<number>;
+
     syncFile(mod: DuckDBModule, fileId: number): void;
     closeFile(mod: DuckDBModule, fileId: number): void;
     getLastFileModificationTime(mod: DuckDBModule, fileId: number): number;
@@ -144,7 +164,13 @@ export interface DuckDBRuntime {
     listDirectoryEntries(mod: DuckDBModule, pathPtr: number, pathLen: number): boolean;
     glob(mod: DuckDBModule, pathPtr: number, pathLen: number): void;
     moveFile(mod: DuckDBModule, fromPtr: number, fromLen: number, toPtr: number, toLen: number): void;
-    checkFile(mod: DuckDBModule, pathPtr: number, pathLen: number): boolean;
+    checkFile(
+        mod: DuckDBModule,
+        pathPtr: number,
+        pathLen: number,
+        urlPtr?: number,
+        urlLen?: number,
+    ): boolean;
     removeFile(mod: DuckDBModule, pathPtr: number, pathLen: number): void;
 
     // Call a scalar UDF function

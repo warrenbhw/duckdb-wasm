@@ -20,7 +20,7 @@ const TEXT_ENCODER = new TextEncoder();
 
 declare global {
     // eslint-disable-next-line no-var
-    var DUCKDB_RUNTIME: any;
+    var DUCKDB_RUNTIME: DuckDBRuntime;
 }
 
 /** A DuckDB Feature */

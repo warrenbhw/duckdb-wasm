@@ -3,10 +3,11 @@ import DuckDB from '../bindings/duckdb-coi';
 import { BROWSER_RUNTIME } from '../bindings/runtime_browser';
 
 // Register the global DuckDB runtime
-globalThis.DUCKDB_RUNTIME = {};
+globalThis.DUCKDB_RUNTIME = {} as any;
 for (const func of Object.getOwnPropertyNames(BROWSER_RUNTIME)) {
     if (func == 'constructor') continue;
-    globalThis.DUCKDB_RUNTIME[func] = Object.getOwnPropertyDescriptor(BROWSER_RUNTIME, func)!.value;
+    const runtime = globalThis.DUCKDB_RUNTIME as any;
+    runtime[func] = Object.getOwnPropertyDescriptor(BROWSER_RUNTIME, func)!.value
 }
 
 // We just override the load handler of the pthread wrapper to bundle DuckDB with esbuild.
@@ -37,7 +38,8 @@ globalThis.onmessage = (e: any) => {
     } else if (e.data.cmd === 'dropUDFFunctions') {
         globalThis.DUCKDB_RUNTIME._udfFunctions = globalThis.DUCKDB_RUNTIME._files || new Map();
         for (const key of globalThis.DUCKDB_RUNTIME._udfFunctions.keys()) {
-            if (globalThis.DUCKDB_RUNTIME._udfFunctions.get(key).connection_id == e.data.connectionId) {
+            // TODO: check if is connection_id or connectionId
+            if ((globalThis.DUCKDB_RUNTIME._udfFunctions.get(key) as any).connection_id == e.data.connectionId) {
                 globalThis.DUCKDB_RUNTIME._udfFunctions.delete(key);
             }
         }

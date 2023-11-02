@@ -1,9 +1,11 @@
+.vscode-cpptools
+
 # flag files
 /check_duckdb
 /wasm_setup
 
 # log files
-/*.log
+yarn-error.log
 
 # MacOS system files
 ._*
