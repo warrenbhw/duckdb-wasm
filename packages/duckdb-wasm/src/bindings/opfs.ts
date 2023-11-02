@@ -1,6 +1,6 @@
 /// <reference types="wicg-file-system-access" />
 
-export const defaultOPFSProtocol = 'opfs:'
+export const defaultOPFSProtocol = 'opfs:';
 
 /** The file handle for OPFS */
 export interface OPFSFileHandle {
@@ -11,6 +11,13 @@ export interface OPFSFileHandle {
     dirPath: string;
     dirHandle: FileSystemDirectoryHandle;
     fileName: string;
+    /**
+     * A flag for the DuckDB internal file system, treat this file as absent if the file is empty.
+     * Because the OPFS API is async, we need to create the placeholder file and
+     * create the FileSystemSyncAccessHandle of it before DuckDB initialize the database
+     * structure in the file.
+     */
+    emptyAsAbsent: boolean;
 
     file?: File;
     fileHandle?: FileSystemFileHandle;
@@ -65,6 +72,7 @@ export class OPFSFileHandleGenerator {
 export type CreateOPFSFileHandleOptions = {
     create?: boolean;
     access?: boolean;
+    emptyAsAbsent?: boolean;
 };
 export async function createOPFSFileHandle(
     dirPath: string,
@@ -74,7 +82,7 @@ export async function createOPFSFileHandle(
 ): Promise<OPFSFileHandle> {
     dirPath = dirPath.replace(/\/$/, '');
     if (!dirPath) dirPath = '/';
-    
+
     const mtx = dirPath.match(/([^/]*)$/);
     if (!mtx) throw new Error(`Invalid dirPath: "${dirPath}"`);
     if (mtx[1] !== dirHandle.name) throw new Error(`dirPath "${dirPath}" is not matched with "${dirHandle.name}"`);
@@ -83,14 +91,28 @@ export async function createOPFSFileHandle(
     let fileHandle: FileSystemFileHandle | undefined;
     let accessHandle: FileSystemSyncAccessHandle | undefined;
 
-    const create = options?.create || false;
-    const access = options?.access || false;
+    let create = false;
+    let access = false;
+    let emptyAsAbsent = false;
+    if (options) {
+        if (options.create) create = true;
+        if (options.access) access = true;
+        if (options.emptyAsAbsent) emptyAsAbsent = true;
+    }
     if (create || access) {
         fileHandle = await dirHandle.getFileHandle(fileName, { create: create || false });
         file = await fileHandle.getFile();
     }
     if (access && fileHandle) accessHandle = await fileHandle.createSyncAccessHandle();
-    return { dirPath, dirHandle, fileName, file, fileHandle, accessHandle };
+    return {
+        dirPath,
+        dirHandle,
+        fileName,
+        file,
+        fileHandle,
+        accessHandle,
+        emptyAsAbsent,
+    };
 }
 
 export function assertOPFSHandle<P extends boolean>(
