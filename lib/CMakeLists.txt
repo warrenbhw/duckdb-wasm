@@ -3,8 +3,8 @@ if(POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)
 endif(POLICY CMP0048)
 
-project(duckdb_wasm VERSION 0.1)
 cmake_minimum_required(VERSION 3.10)
+project(duckdb_wasm VERSION 0.1)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -19,6 +19,20 @@ endif()
 if(NOT EMSCRIPTEN)
   set(CMAKE_CXX_FLAGS_DEBUG
       "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined")
+endif()
+
+# ---------------------------------------------------------------------------
+# System Environment Variables
+
+if("$ENV{ENABLE_DATADOCS_EXTENSION}" STREQUAL "OFF")
+  message(
+    WARNING 
+    "datadocs extension is disabled by environment variable DATADOCS_EXTENSION.\
+    DO NOT use this option in production mode"
+  )
+  set(ENABLE_DATADOCS_EXTENSION OFF)
+else()
+  set(ENABLE_DATADOCS_EXTENSION ON)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -89,6 +103,12 @@ if(EMSCRIPTEN)
     # ... with fast linking
     if(WASM_FAST_LINKING)
       set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O0")
+      # set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O0")
+      # We have to use Asyncify:
+      # https://emscripten.org/docs/porting/asyncify.html
+      # then we can use -O0 optimization option,
+      # Because it can produce an issue when the frontend is compiling WASM file:
+      # Compiling function #14817:"unsigned long long ..." failed: local count too large
     endif()
   # Debug build
   elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -110,6 +130,8 @@ if(EMSCRIPTEN)
 
   if(WITH_WASM_EXCEPTIONS)
     set(DUCKDB_PLATFORM "wasm_eh")
+    # The option `-f wasm-exceptions` can works with `-s ASYNCIFY`.
+    # So we disabled the following config
     set(CMAKE_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1")
   else()
@@ -242,15 +264,18 @@ add_library(
   duckdb_web_json
   ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
 
+if(ENABLE_DATADOCS_EXTENSION)
 add_library(
   duckdb_web_datadocs
   ${CMAKE_SOURCE_DIR}/src/extensions/datadocs_extension.cc)
+endif()
 
 set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
 set(EXCEL_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/excel")
 set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
+if(ENABLE_DATADOCS_EXTENSION)
 set(DATADOCS_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/datadocs")
-
+endif()
 set(DUCKDB_WEB_EXCEL "")
 if(EXISTS "${EXCEL_EXTENSION_CACHE_FILE}")
   set(DUCKDB_WEB_EXCEL "duckdb_web_excel")
@@ -261,10 +286,12 @@ if(EXISTS "${JSON_EXTENSION_CACHE_FILE}")
   set(DUCKDB_WEB_JSON "duckdb_web_json")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_JSON_EXTENSION")
 endif()
+if(ENABLE_DATADOCS_EXTENSION)
 set(DUCKDB_WEB_DATADOCS "")
 if(EXISTS "${DATADOCS_EXTENSION_CACHE_FILE}")
   set(DUCKDB_WEB_DATADOCS "duckdb_web_datadocs")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_DATADOCS_EXTENSION")
+endif()
 endif()
 
 target_link_libraries(duckdb_web duckdb duckdb_web_fts duckdb_web_parquet ${DUCKDB_WEB_EXCEL} ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} arrow rapidjson ${THREAD_LIBS})
@@ -272,7 +299,9 @@ target_link_libraries(duckdb_web_fts duckdb duckdb_fts)
 target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
 target_link_libraries(duckdb_web_excel duckdb duckdb_excel)
 target_link_libraries(duckdb_web_json duckdb duckdb_json)
+if(ENABLE_DATADOCS_EXTENSION)
 target_link_libraries(duckdb_web_datadocs duckdb duckdb_datadocs)
+endif()
 
 # ---------------------------------------------------------------------------
 # Emscripten
@@ -294,7 +323,8 @@ if(EMSCRIPTEN)
       -s ALLOW_MEMORY_GROWTH=1 \
       -s MAXIMUM_MEMORY=4GB \
       -s MODULARIZE=1 \
-      -s WASMFS=1 \
+      -s ASYNCIFY \
+      -s ASYNCIFY_IGNORE_INDIRECT=1 \
       -s EXPORT_NAME='DuckDB' \
       -s EXPORTED_FUNCTIONS='[ \
           _main, \
