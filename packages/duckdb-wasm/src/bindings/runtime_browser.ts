@@ -12,6 +12,7 @@ import {
     FileFlags,
     readString,
 } from './runtime';
+import { assertOPFSHandle, OPFSFileHandle } from './opfs';
 import { DuckDBModule } from './duckdb_module';
 import * as udf from './udf_runtime';
 
@@ -322,27 +323,36 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
             return 0;
         }
     },
-    checkFile: (mod: DuckDBModule, pathPtr: number, pathLen: number): boolean => {
+    checkFile: (mod: DuckDBModule, pathPtr: number, pathLen: number, urlPtr?: number, urlLen?: number): boolean => {
         try {
             const path = readString(mod, pathPtr, pathLen);
-            // Starts with http or S3?
+            const handle = BROWSER_RUNTIME._files?.get(path);
+
+            const url = urlPtr && urlLen && urlLen > 0 ? readString(mod, urlPtr, urlLen) : '';
+            if (handle && url.startsWith('opfs://')) {
+                const opfsHandle: OPFSFileHandle = handle;
+                const isEmpty = opfsHandle.file?.size === 0;
+                if (isEmpty && opfsHandle.emptyAsAbsent) return false;
+                return true;
+            }
             // Try a HTTP HEAD request
-            if (path.startsWith('http') || path.startsWith('s3://')) {
+            if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('s3://')) {
                 // Send a dummy range request querying the first byte of the file
                 const xhr = new XMLHttpRequest();
-                if (path.startsWith('s3://')) {
+                if (url.startsWith('s3://')) {
                     const globalInfo = BROWSER_RUNTIME.getGlobalFileInfo(mod);
-                    xhr.open('HEAD', getHTTPUrl(globalInfo?.s3Config, path), false);
-                    addS3Headers(xhr, globalInfo?.s3Config, path, 'HEAD');
+                    xhr.open('HEAD', getHTTPUrl(globalInfo?.s3Config, url), false);
+                    addS3Headers(xhr, globalInfo?.s3Config, url, 'HEAD');
                 } else {
-                    xhr.open('HEAD', path!, false);
+                    xhr.open('HEAD', url!, false);
                 }
                 xhr.send(null);
                 return xhr.status == 206 || xhr.status == 200;
             }
+
+            if (handle) return true;
         } catch (e: any) {
             console.log(e);
-            return false;
         }
         return false;
     },
