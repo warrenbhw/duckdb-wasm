@@ -104,44 +104,10 @@ export class WorkerTask<T, D, P> {
     }
 }
 
-export type WorkerRequestVariant =
-    | WorkerRequest<WorkerRequestType.CLOSE_PREPARED, [ConnectionID, StatementID]>
-    | WorkerRequest<WorkerRequestType.CANCEL_PENDING_QUERY, number>
-    | WorkerRequest<WorkerRequestType.COLLECT_FILE_STATISTICS, [string, boolean]>
-    | WorkerRequest<WorkerRequestType.CONNECT, null>
-    | WorkerRequest<WorkerRequestType.COPY_FILE_TO_BUFFER, string>
-    | WorkerRequest<WorkerRequestType.COPY_FILE_TO_PATH, [string, string]>
-    | WorkerRequest<WorkerRequestType.CREATE_PREPARED, [ConnectionID, string]>
-    | WorkerRequest<WorkerRequestType.DISCONNECT, number>
-    | WorkerRequest<WorkerRequestType.DROP_FILE, string>
-    | WorkerRequest<WorkerRequestType.DROP_FILES, null>
-    | WorkerRequest<WorkerRequestType.EXPORT_FILE_STATISTICS, string>
-    | WorkerRequest<WorkerRequestType.FETCH_QUERY_RESULTS, number>
-    | WorkerRequest<WorkerRequestType.FLUSH_FILES, null>
-    | WorkerRequest<WorkerRequestType.GET_FEATURE_FLAGS, null>
-    | WorkerRequest<WorkerRequestType.GET_TABLE_NAMES, [number, string]>
-    | WorkerRequest<WorkerRequestType.GET_VERSION, null>
-    | WorkerRequest<WorkerRequestType.GLOB_FILE_INFOS, string>
-    | WorkerRequest<
-          WorkerRequestType.INSERT_ARROW_FROM_IPC_STREAM,
-          [number, Uint8Array, ArrowInsertOptions | undefined]
-      >
-    | WorkerRequest<WorkerRequestType.INSERT_CSV_FROM_PATH, [number, string, CSVInsertOptions]>
-    | WorkerRequest<WorkerRequestType.INSERT_JSON_FROM_PATH, [number, string, JSONInsertOptions]>
-    | WorkerRequest<WorkerRequestType.INSTANTIATE, [string, string | null]>
-    | WorkerRequest<WorkerRequestType.OPEN, DuckDBConfig>
-    | WorkerRequest<WorkerRequestType.PING, null>
-    | WorkerRequest<WorkerRequestType.POLL_PENDING_QUERY, number>
-    | WorkerRequest<WorkerRequestType.REGISTER_FILE_BUFFER, [string, Uint8Array]>
-    | WorkerRequest<WorkerRequestType.REGISTER_FILE_HANDLE, [string, any, DuckDBDataProtocol, boolean]>
-    | WorkerRequest<WorkerRequestType.REGISTER_FILE_URL, [string, string, DuckDBDataProtocol, boolean]>
-    | WorkerRequest<WorkerRequestType.RESET, null>
-    | WorkerRequest<WorkerRequestType.RUN_PREPARED, [number, number, any[]]>
-    | WorkerRequest<WorkerRequestType.RUN_QUERY, [number, string]>
-    | WorkerRequest<WorkerRequestType.SEND_PREPARED, [number, number, any[]]>
-    | WorkerRequest<WorkerRequestType.START_PENDING_QUERY, [number, string]>
-    | WorkerRequest<WorkerRequestType.TOKENIZE, string>;
-
+type ExtractWorkerRequestVariant<T> = T extends WorkerTask<infer TaskType, infer DataType, any>
+    ? WorkerRequest<TaskType, DataType>
+    : never;
+export type WorkerRequestVariant = ExtractWorkerRequestVariant<WorkerTaskVariant>;
 export type WorkerResponseVariant =
     | WorkerResponse<WorkerResponseType.CONNECTION_INFO, number>
     | WorkerResponse<WorkerResponseType.ERROR, any>
@@ -166,11 +132,11 @@ export type WorkerResponseVariant =
 
 export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.COLLECT_FILE_STATISTICS, [string, boolean], null>
-    | WorkerTask<WorkerRequestType.CLOSE_PREPARED, [number, number], null>
+    | WorkerTask<WorkerRequestType.CLOSE_PREPARED, [ConnectionID, StatementID], null>
     | WorkerTask<WorkerRequestType.CONNECT, null, ConnectionID>
     | WorkerTask<WorkerRequestType.COPY_FILE_TO_BUFFER, string, Uint8Array>
     | WorkerTask<WorkerRequestType.COPY_FILE_TO_PATH, [string, string], null>
-    | WorkerTask<WorkerRequestType.CREATE_PREPARED, [number, string], number>
+    | WorkerTask<WorkerRequestType.CREATE_PREPARED, [ConnectionID, string], number>
     | WorkerTask<WorkerRequestType.DISCONNECT, ConnectionID, null>
     | WorkerTask<WorkerRequestType.DROP_FILE, string, null>
     | WorkerTask<WorkerRequestType.DROP_FILES, null, null>
