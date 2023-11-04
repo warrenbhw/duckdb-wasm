@@ -85,6 +85,7 @@ target_link_libraries(
   INTERFACE ${install_dir}/lib/libduckdb_pg_query.a
   INTERFACE ${install_dir}/lib/libduckdb_utf8proc.a
   INTERFACE ${install_dir}/lib/libduckdb_fastpforlib.a
+  INTERFACE ${install_dir}/lib/libicu.a
   INTERFACE dl)
 
 target_include_directories(
