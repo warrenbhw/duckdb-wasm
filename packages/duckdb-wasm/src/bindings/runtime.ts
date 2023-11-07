@@ -43,6 +43,9 @@ export enum DuckDBDataProtocol {
     HTTP = 4,
     S3 = 5,
 }
+export function getDataProtocolName(protocol?: number | string) {
+    return (typeof protocol === 'number' && DuckDBDataProtocol[protocol]) || String(protocol);
+}
 
 /** File flags for opening files*/
 export enum FileFlags {
@@ -58,6 +61,20 @@ export enum FileFlags {
     FILE_FLAGS_FILE_CREATE_NEW = 1 << 4,
     //! Open file in append mode
     FILE_FLAGS_APPEND = 1 << 5,
+}
+
+/**
+ * The result type of openFile function.
+ * from C++ source file: lib/src/io/web_filesystem.cc
+ */
+export class OpenedFile {
+    constructor(readonly fileSize: number, readonly fileBufferPtr = 0) { }
+    getCppPointer(mod: EmscriptenModule) {
+        const ptr = mod._malloc(2 * 8); // 2 double variables
+        mod.HEAPF64[(ptr >> 3) + 0] = this.fileSize; // the first double is file_size
+        mod.HEAPF64[(ptr >> 3) + 1] = this.fileBufferPtr; // the second double is file_buffer
+        return ptr;
+    }
 }
 
 /** Configuration for the AWS S3 Filesystem */
@@ -87,13 +104,15 @@ export interface DuckDBGlobalFileInfo {
     s3Config?: S3Config;
 }
 
+export type CallSRetResult = [status: number, dataPtr: number, dataSize: number];
+
 /** Call a function with packed response buffer */
 export function callSRet(
     mod: DuckDBModule,
     funcName: string,
     argTypes: Array<Emscripten.JSType>,
     args: Array<any>,
-): [number, number, number] {
+): CallSRetResult {
     const stackPointer = mod.stackSave();
 
     // Allocate the packed response buffer
@@ -121,6 +140,7 @@ export function dropResponseBuffers(mod: DuckDBModule): void {
 
 /** The duckdb runtime */
 export interface DuckDBRuntime {
+    /** Mapping from file path to file handle */
     _files?: Map<string, any>;
     _udfFunctions: Map<number, UDFFunction>;
 
@@ -130,8 +150,11 @@ export interface DuckDBRuntime {
     // File APIs with dedicated file identifier
     getDefaultDataProtocol(mod: DuckDBModule): number;
     openFile(mod: DuckDBModule, fileId: number, flags: FileFlags): void;
+    openFileAsync?(mod: DuckDBModule, fileId: number, flags: FileFlags): Promise<number>;
+
     syncFile(mod: DuckDBModule, fileId: number): void;
     closeFile(mod: DuckDBModule, fileId: number): void;
+    closeFileByName?(mod: DuckDBModule, fileName: string): boolean;
     getLastFileModificationTime(mod: DuckDBModule, fileId: number): number;
     truncateFile(mod: DuckDBModule, fileId: number, newSize: number): void;
     readFile(mod: DuckDBModule, fileId: number, buffer: number, bytes: number, location: number): number;
@@ -144,7 +167,7 @@ export interface DuckDBRuntime {
     listDirectoryEntries(mod: DuckDBModule, pathPtr: number, pathLen: number): boolean;
     glob(mod: DuckDBModule, pathPtr: number, pathLen: number): void;
     moveFile(mod: DuckDBModule, fromPtr: number, fromLen: number, toPtr: number, toLen: number): void;
-    checkFile(mod: DuckDBModule, pathPtr: number, pathLen: number): boolean;
+    checkFile(mod: DuckDBModule, pathPtr: number, pathLen: number, urlPtr?: number, urlLen?: number): boolean;
     removeFile(mod: DuckDBModule, pathPtr: number, pathLen: number): void;
 
     // Call a scalar UDF function
@@ -167,6 +190,8 @@ export const DEFAULT_RUNTIME: DuckDBRuntime = {
     openFile: (_mod: DuckDBModule, _fileId: number, flags: FileFlags): void => {},
     syncFile: (_mod: DuckDBModule, _fileId: number): void => {},
     closeFile: (_mod: DuckDBModule, _fileId: number): void => {},
+    closeFileByName: (_mod: DuckDBModule, _fileName: string) => false,
+
     getLastFileModificationTime: (_mod: DuckDBModule, _fileId: number): number => {
         return 0;
     },

@@ -1,13 +1,13 @@
 import DuckDBWasm from './duckdb-mvp.js';
 import { DuckDBModule } from './duckdb_module';
 import { DuckDBBindingsBase } from './bindings_base';
-import { DuckDBRuntime } from './runtime';
+import type { DuckDBRuntime } from './runtime';
 import { Logger } from '../log';
 import fs from 'fs';
 
 declare global {
     // eslint-disable-next-line no-var
-    var DUCKDB_RUNTIME: any;
+    var DUCKDB_RUNTIME: DuckDBRuntime;
 }
 
 /** DuckDB bindings for node.js */
@@ -49,10 +49,11 @@ export class DuckDBNodeBindings extends DuckDBBindingsBase {
         imports: any,
         success: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
     ): Emscripten.WebAssemblyExports {
-        globalThis.DUCKDB_RUNTIME = {};
+        globalThis.DUCKDB_RUNTIME = {} as any;
         for (const func of Object.getOwnPropertyNames(this._runtime)) {
             if (func == 'constructor') continue;
-            globalThis.DUCKDB_RUNTIME[func] = Object.getOwnPropertyDescriptor(this._runtime, func)!.value;
+            const runtime = globalThis.DUCKDB_RUNTIME as any;
+            runtime[func] = Object.getOwnPropertyDescriptor(this._runtime, func)!.value;
         }
         const buf = fs.readFileSync(this.mainModulePath);
         WebAssembly.instantiate(buf, imports).then(output => {

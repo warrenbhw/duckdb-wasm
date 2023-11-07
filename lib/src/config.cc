@@ -50,13 +50,16 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
                                   FileSystemConfig{
                                       .allow_full_http_reads = std::nullopt,
                                   },
-                              .duckdb_config_options = DuckDBConfigOptions{
-                                  .s3_region = "",
-                                  .s3_endpoint = "",
-                                  .s3_access_key_id = "",
-                                  .s3_secret_access_key = "",
-                                  .s3_session_token = "",
-                              }};
+                              .duckdb_config_options =
+                                  DuckDBConfigOptions{
+                                      .s3_region = "",
+                                      .s3_endpoint = "",
+                                      .s3_access_key_id = "",
+                                      .s3_secret_access_key = "",
+                                      .s3_session_token = "",
+                                  },
+                              .force_checkpoint = false,
+                              .checkpoint_wal_size = 1 << 24};
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(args_json.begin(), args_json.size());
     if (ok) {
@@ -92,6 +95,14 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
             if (fs.HasMember("allowFullHTTPReads") && fs["allowFullHTTPReads"].IsBool()) {
                 config.filesystem.allow_full_http_reads = fs["allowFullHTTPReads"].GetBool();
             }
+        }
+        if (doc.HasMember("checkpointWALSize") && doc["checkpointWALSize"].IsNumber()) {
+            auto checkpoint_wal_size = doc["checkpointWALSize"].GetUint64();
+            config.checkpoint_wal_size = checkpoint_wal_size;
+        }
+        if (doc.HasMember("forceCheckpoint") && doc["forceCheckpoint"].IsBool()) {
+            auto force_checkpoint = doc["forceCheckpoint"].GetUint64();
+            config.force_checkpoint = force_checkpoint;
         }
     }
     if (!config.query.cast_bigint_to_double.has_value()) {

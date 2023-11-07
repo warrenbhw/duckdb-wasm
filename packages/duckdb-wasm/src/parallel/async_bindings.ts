@@ -260,6 +260,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
                 }
                 break;
             case WorkerRequestType.CANCEL_PENDING_QUERY:
+            case WorkerRequestType.CLOSE_FILE:
                 this._onInstantiationProgress = [];
                 if (response.type == WorkerResponseType.SUCCESS) {
                     task.promiseResolver(response.data);
@@ -323,6 +324,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** Flush all files */
     public async flushFiles(): Promise<null> {
         const task = new WorkerTask<WorkerRequestType.FLUSH_FILES, null, null>(WorkerRequestType.FLUSH_FILES, null);
+        return await this.postTask(task);
+    }
+    public async closeFile(name: string): Promise<boolean> {
+        const task = new WorkerTask<WorkerRequestType.CLOSE_FILE, string, boolean>(WorkerRequestType.CLOSE_FILE, name);
         return await this.postTask(task);
     }
 
@@ -525,9 +530,9 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     }
 
     /** Register a file handle. */
-    public async registerFileHandle<HandleType>(
+    public async registerFileHandle(
         name: string,
-        handle: HandleType,
+        handle: any,
         protocol: DuckDBDataProtocol,
         directIO: boolean,
     ): Promise<void> {

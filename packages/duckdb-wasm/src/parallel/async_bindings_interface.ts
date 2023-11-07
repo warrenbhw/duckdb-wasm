@@ -1,6 +1,6 @@
 import { Logger } from '../log';
 import { CSVInsertOptions, JSONInsertOptions } from '../bindings/insert_options';
-import { DuckDBDataProtocol } from '../bindings';
+import type { DuckDBDataProtocol, OPFSFileHandle } from '../bindings';
 
 /** An interface for the async DuckDB bindings */
 export interface AsyncDuckDBBindings {
@@ -8,13 +8,18 @@ export interface AsyncDuckDBBindings {
 
     registerFileURL(name: string, url: string, proto: DuckDBDataProtocol, directIO: boolean): Promise<void>;
     registerFileBuffer(name: string, buffer: Uint8Array): Promise<void>;
-    registerFileHandle<HandleType>(
+
+    // OPFS
+    registerFileHandle(
         name: string,
-        handle: HandleType,
-        protocol: DuckDBDataProtocol,
+        handle: OPFSFileHandle,
+        protocol: DuckDBDataProtocol.BROWSER_FSACCESS,
         directIO: boolean,
     ): Promise<void>;
+    // Other File Handle
+    registerFileHandle(name: string, handle: any, protocol: DuckDBDataProtocol, directIO: boolean): Promise<void>;
     copyFileToPath(name: string, out: string): Promise<void>;
+
     copyFileToBuffer(name: string): Promise<Uint8Array>;
 
     disconnect(conn: number): Promise<void>;

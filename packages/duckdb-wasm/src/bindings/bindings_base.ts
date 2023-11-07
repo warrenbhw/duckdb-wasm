@@ -5,7 +5,9 @@ import { InstantiationProgress } from './progress';
 import { DuckDBBindings } from './bindings_interface';
 import { DuckDBConnection } from './connection';
 import { StatusCode } from '../status';
-import { dropResponseBuffers, DuckDBRuntime, readString, callSRet, copyBuffer, DuckDBDataProtocol } from './runtime';
+import { dropResponseBuffers, readString, callSRet, copyBuffer, DuckDBDataProtocol } from './runtime';
+import type { DuckDBRuntime } from './runtime';
+import { OPFSFileHandle, stringifyOPFSURL } from './opfs';
 import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from './insert_options';
 import { ScriptTokens } from './tokens';
 import { FileStatistics } from './file_stats';
@@ -14,11 +16,13 @@ import { WebFile } from './web_file';
 import { UDFFunction, UDFFunctionDeclaration } from './udf_function';
 import * as arrow from 'apache-arrow';
 
+const logWASMCall = !!process.env.KEEP_DEBUG_LOGS;
+
 const TEXT_ENCODER = new TextEncoder();
 
 declare global {
     // eslint-disable-next-line no-var
-    var DUCKDB_RUNTIME: any;
+    var DUCKDB_RUNTIME: DuckDBRuntime;
 }
 
 /** A DuckDB Feature */
@@ -444,23 +448,44 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         dropResponseBuffers(this.mod);
     }
     /** Register a file object URL */
-    public registerFileHandle<HandleType>(
+    public async registerFileHandle<HandleType>(
         name: string,
         handle: HandleType,
         protocol: DuckDBDataProtocol,
         directIO: boolean,
-    ): void {
+    ): Promise<void> {
+        let fileURL = name;
+        // Normalize the name and URL for OPFS file handle
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
+            const opfsHandle: OPFSFileHandle = handle as any;
+            if (!opfsHandle?.filePath) throw new Error(`Invalid OPFS file handle for "${name}"`);
+            const { filePath, domain } = opfsHandle;
+            if (!opfsHandle._url) opfsHandle._url = stringifyOPFSURL(filePath, false, domain);
+            fileURL = opfsHandle._url;
+        }
         const [s, d, n] = callSRet(
             this.mod,
             'duckdb_web_fs_register_file_url',
             ['string', 'string', 'number', 'boolean'],
-            [name, name, protocol, directIO],
+            [name, fileURL, protocol, directIO],
         );
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
         dropResponseBuffers(this.mod);
         globalThis.DUCKDB_RUNTIME._files = (globalThis.DUCKDB_RUNTIME._files || new Map()).set(name, handle);
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
+            const opfsHandle: OPFSFileHandle = handle as any;
+            const { fileHandle } = opfsHandle;
+            if (fileHandle) {
+                if (!opfsHandle.accessHandle) {
+                    opfsHandle.accessHandle = await fileHandle.createSyncAccessHandle();
+                    console.debug(`prepared SyncAccessHandle for OPFS file "${name}"`);
+                }
+            } else {
+                console.warn(`Invalid file handle for OPFS file "${name}"`);
+            }
+        }
         if (this.pthread) {
             for (const worker of this.pthread.runningWorkers) {
                 worker.postMessage({
@@ -493,9 +518,19 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         }
         dropResponseBuffers(this.mod);
     }
+    
     /** Flush all files */
-    public flushFiles(): void {
+    public flushFiles() {
         this.mod.ccall('duckdb_web_flush_files', null, [], []);
+        const entries = this._runtime._files?.entries();
+        if (!entries) return;
+        for (const [fileName, handle] of entries) {
+            if ((handle as OPFSFileHandle).accessHandle) {
+                if (logWASMCall) console.log(`[WASM-CALL] flushFiles() => flushFile("${fileName}")`);
+                const opfs: OPFSFileHandle = handle;
+                if (opfs.accessHandle) opfs.accessHandle.flush();
+            }
+        }
     }
     /** Write a file to a path */
     public copyFileToPath(name: string, path: string): void {
@@ -516,6 +551,12 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         copy.set(buffer);
         dropResponseBuffers(this.mod);
         return copy;
+    }
+
+    /** Close file (This method is used for explicitly clsoing OPFS file handle) */
+    public closeFile(fileName: string): boolean {
+        const ok = this._runtime.closeFileByName?.(this.mod, fileName);
+        return ok || false;
     }
 
     /** Enable tracking of file statistics */

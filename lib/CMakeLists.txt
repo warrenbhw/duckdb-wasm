@@ -3,14 +3,30 @@ if(POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)
 endif(POLICY CMP0048)
 
-project(duckdb_wasm VERSION 0.1)
 cmake_minimum_required(VERSION 3.10)
+project(duckdb_wasm VERSION 0.1)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS -std=c++17)
 set(ignoreMe "${DUCKDB_WASM_VERSION}")
+
+# We need to enable this option if we need to implement async operation (E.g., async file system)
+# for DuckDB in the future.
+#
+# Asyncify lets synchronous C or C++ code interact with asynchronous JavaScript. 
+# References:
+# https://emscripten.org/docs/porting/asyncify.html
+# https://web.dev/articles/asyncify
+# 
+# But Asyncify has some disadvantage now (2023-11-03), just like:
+# 1. It is not compatible with `-f wasm-exceptions`
+# 2. `-O3` optimization option is necessary for all build mode
+#    Because an unoptimized builds with Asyncify are very large and 
+#    it can cause a `local count too large` error in the frontend.
+# 
+set(ENABLE_EMSCRIPTEN_ASYNCIFY OFF)
 
 if(DUCKDUB_WASM_LOADABLE_EXTENSIONS)
   set(CMAKE_CXX_FLAGS "-std=c++17 -fPIC -DWASM_LOADABLE_EXTENSIONS=1")
@@ -19,6 +35,20 @@ endif()
 if(NOT EMSCRIPTEN)
   set(CMAKE_CXX_FLAGS_DEBUG
       "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined")
+endif()
+
+# ---------------------------------------------------------------------------
+# System Environment Variables
+
+if("$ENV{ENABLE_DATADOCS_EXTENSION}" STREQUAL "OFF")
+  message(
+    WARNING 
+    "datadocs extension is disabled by environment variable DATADOCS_EXTENSION.\
+    DO NOT use this option in production mode"
+  )
+  set(ENABLE_DATADOCS_EXTENSION OFF)
+else()
+  set(ENABLE_DATADOCS_EXTENSION ON)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -72,13 +102,19 @@ endif ()
 set(DUCKDB_PLATFORM "wasm_mvp")
 
 if(EMSCRIPTEN)
+  if(ENABLE_EMSCRIPTEN_ASYNCIFY)
+    set(DEFAULT_WASM_OPTIMIZATION_OPT "-O3")
+  else()
+    set(DEFAULT_WASM_OPTIMIZATION_OPT "-O0")
+  endif()
+
   # Release build
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
     # ... with min size
     if(WASM_MIN_SIZE)
       set(CMAKE_CXX_FLAGS_RELEASE "-Oz")
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -Oz")
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ")
     else()
       # ... with max performance
       set(CMAKE_CXX_FLAGS_RELEASE "-O3")
@@ -88,7 +124,7 @@ if(EMSCRIPTEN)
   elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     # ... with fast linking
     if(WASM_FAST_LINKING)
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O0")
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${DEFAULT_WASM_OPTIMIZATION_OPT}")
     endif()
   # Debug build
   elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -104,12 +140,14 @@ if(EMSCRIPTEN)
       -sSEPARATE_DWARF_URL=file://${CMAKE_BINARY_DIR}/duckdb.wasm")
     # ... with fast linking
     if(WASM_FAST_LINKING)
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O0")
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${DEFAULT_WASM_OPTIMIZATION_OPT}")
     endif()
   endif()
 
   if(WITH_WASM_EXCEPTIONS)
     set(DUCKDB_PLATFORM "wasm_eh")
+    # The option `-f wasm-exceptions` is not compatible with `-s ASYNCIFY`.
+    # So we may need to disable the config in the next line
     set(CMAKE_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1")
   else()
@@ -242,15 +280,18 @@ add_library(
   duckdb_web_json
   ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
 
+if(ENABLE_DATADOCS_EXTENSION)
 add_library(
   duckdb_web_datadocs
   ${CMAKE_SOURCE_DIR}/src/extensions/datadocs_extension.cc)
+endif()
 
 set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
 set(EXCEL_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/excel")
 set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
+if(ENABLE_DATADOCS_EXTENSION)
 set(DATADOCS_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/datadocs")
-
+endif()
 set(DUCKDB_WEB_EXCEL "")
 if(EXISTS "${EXCEL_EXTENSION_CACHE_FILE}")
   set(DUCKDB_WEB_EXCEL "duckdb_web_excel")
@@ -261,8 +302,7 @@ if(EXISTS "${JSON_EXTENSION_CACHE_FILE}")
   set(DUCKDB_WEB_JSON "duckdb_web_json")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_JSON_EXTENSION")
 endif()
-set(DUCKDB_WEB_DATADOCS "")
-if(EXISTS "${DATADOCS_EXTENSION_CACHE_FILE}")
+if(ENABLE_DATADOCS_EXTENSION)
   set(DUCKDB_WEB_DATADOCS "duckdb_web_datadocs")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_DATADOCS_EXTENSION")
 endif()
@@ -272,10 +312,15 @@ target_link_libraries(duckdb_web_fts duckdb duckdb_fts)
 target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
 target_link_libraries(duckdb_web_excel duckdb duckdb_excel)
 target_link_libraries(duckdb_web_json duckdb duckdb_json)
+if(ENABLE_DATADOCS_EXTENSION)
 target_link_libraries(duckdb_web_datadocs duckdb duckdb_datadocs)
+endif()
 
 # ---------------------------------------------------------------------------
 # Emscripten
+if(ENABLE_EMSCRIPTEN_ASYNCIFY)
+  set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -s ASYNCIFY -s ASYNCIFY_IGNORE_INDIRECT=1")
+endif()
 
 # We need "-s WARN_ON_UNDEFINED_SYMBOLS=0" to instantiate the module with our
 # own imports.
@@ -294,7 +339,6 @@ if(EMSCRIPTEN)
       -s ALLOW_MEMORY_GROWTH=1 \
       -s MAXIMUM_MEMORY=4GB \
       -s MODULARIZE=1 \
-      -s FILESYSTEM=0 \
       -s EXPORT_NAME='DuckDB' \
       -s EXPORTED_FUNCTIONS='[ \
           _main, \

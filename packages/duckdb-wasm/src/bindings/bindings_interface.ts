@@ -41,11 +41,12 @@ export interface DuckDBBindings {
         handle: HandleType,
         protocol: DuckDBDataProtocol,
         directIO: boolean,
-    ): void;
+    ): Promise<void>;
     globFiles(path: string): WebFile[];
     dropFile(name: string): void;
     dropFiles(): void;
     flushFiles(): void;
+    closeFile(name: string): boolean;
     copyFileToPath(name: string, path: string): void;
     copyFileToBuffer(name: string): Uint8Array;
     collectFileStatistics(file: string, enable: boolean): void;

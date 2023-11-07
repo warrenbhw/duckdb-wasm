@@ -448,15 +448,6 @@
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.7.tgz#1d572bfbbe14b7704e0ba0f39b74815b84870d70"
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
-"@duckdb/duckdb-wasm-shell@file:packages/duckdb-wasm-shell":
-  version "1.11.0"
-  dependencies:
-    "@duckdb/duckdb-wasm" "file:packages/duckdb-wasm"
-    xterm "^5.1.0"
-    xterm-addon-fit "^0.7.0"
-    xterm-addon-web-links "^0.8.0"
-    xterm-addon-webgl "^0.14.0"
-
 "@duckdb/duckdb-wasm@file:packages/duckdb-wasm":
   version "1.11.0"
   dependencies:
@@ -1160,6 +1151,11 @@
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/@types/warning/-/warning-3.0.0.tgz#0d2501268ad8f9962b740d387c4654f5f8e23e52"
   integrity sha1-DSUBJorY+ZYrdA04fEZU9fjiPlI=
+
+"@types/wicg-file-system-access@^2023.10.2":
+  version "2023.10.2"
+  resolved "https://registry.yarnpkg.com/@types/wicg-file-system-access/-/wicg-file-system-access-2023.10.2.tgz#1a1cb2fb102b3d6516826aa593ba2a30d59cac7d"
+  integrity sha512-nSiK8qt0O7sQmDcW3HYfvya7GDoD6ipgdcUFzk3QN+UBIqXeNg38Nh6VnKv7EIPfkVETRiquyMskCbpxUzgX1Q==
 
 "@types/ws@^8.5.1":
   version "8.5.3"
@@ -7131,6 +7127,11 @@ typescript@^4.8.4:
   version "4.8.4"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.8.4.tgz#c464abca159669597be5f96b8943500b238e60e6"
   integrity sha512-QCh+85mCy+h0IGff8r5XWzOVSbBO+KfeYrMQh7NJ58QujwcE22u+NUSmUxqF+un70P9GXKxa2HCNiTTMJknyjQ==
+
+typescript@^5:
+  version "5.2.2"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.2.2.tgz#5ebb5e5a5b75f085f22bc3f8460fba308310fa78"
+  integrity sha512-mI4WrpHsbCIcwT9cF4FZvr80QUeKvsUsUvKDoR+X/7XHQH98xYD8YHZg7ANtz2GtZt/CBq2QJ0thkGJMHfqc1w==
 
 typical@^2.6.1:
   version "2.6.1"
