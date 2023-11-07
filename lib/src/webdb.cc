@@ -819,6 +819,9 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         db_config.options.maximum_threads = config_->maximum_threads;
         db_config.options.use_temporary_directory = false;
         db_config.options.access_mode = access_mode;
+        db_config.options.force_checkpoint = config_->force_checkpoint;
+        if (config_->checkpoint_wal_size.has_value())
+            db_config.options.checkpoint_wal_size = config_->checkpoint_wal_size.value();
         auto db = std::make_shared<duckdb::DuckDB>(config_->path, &db_config);
 #ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());
