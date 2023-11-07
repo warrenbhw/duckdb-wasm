@@ -68,11 +68,11 @@ export enum FileFlags {
  * from C++ source file: lib/src/io/web_filesystem.cc
  */
 export class OpenedFile {
-    constructor(readonly fileSize: number, readonly fileBuffer: number) {}
+    constructor(readonly fileSize: number, readonly fileBufferPtr = 0) { }
     getCppPointer(mod: EmscriptenModule) {
         const ptr = mod._malloc(2 * 8); // 2 double variables
         mod.HEAPF64[(ptr >> 3) + 0] = this.fileSize; // the first double is file_size
-        mod.HEAPF64[(ptr >> 3) + 0] = this.fileBuffer; // the second double is file_buffer
+        mod.HEAPF64[(ptr >> 3) + 1] = this.fileBufferPtr; // the second double is file_buffer
         return ptr;
     }
 }
@@ -104,13 +104,15 @@ export interface DuckDBGlobalFileInfo {
     s3Config?: S3Config;
 }
 
+export type CallSRetResult = [status: number, dataPtr: number, dataSize: number];
+
 /** Call a function with packed response buffer */
 export function callSRet(
     mod: DuckDBModule,
     funcName: string,
     argTypes: Array<Emscripten.JSType>,
     args: Array<any>,
-): [number, number, number] {
+): CallSRetResult {
     const stackPointer = mod.stackSave();
 
     // Allocate the packed response buffer
