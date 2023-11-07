@@ -6,8 +6,8 @@ import { DuckDBBindings } from './bindings_interface';
 import { DuckDBConnection } from './connection';
 import { StatusCode } from '../status';
 import { dropResponseBuffers, readString, callSRet, copyBuffer, DuckDBDataProtocol } from './runtime';
-import type { DuckDBRuntime } from "./runtime";
-import { OPFSFileHandle, defaultOPFSProtocol } from './opfs';
+import type { DuckDBRuntime } from './runtime';
+import { OPFSFileHandle, stringifyOPFSURL } from './opfs';
 import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from './insert_options';
 import { ScriptTokens } from './tokens';
 import { FileStatistics } from './file_stats';
@@ -15,6 +15,8 @@ import { arrowToSQLField, arrowToSQLType } from '../json_typedef';
 import { WebFile } from './web_file';
 import { UDFFunction, UDFFunctionDeclaration } from './udf_function';
 import * as arrow from 'apache-arrow';
+
+const logWASMCall = !!process.env.KEEP_DEBUG_LOGS;
 
 const TEXT_ENCODER = new TextEncoder();
 
@@ -455,12 +457,11 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         let fileURL = name;
         // Normalize the name and URL for OPFS file handle
         if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
-            name = name.replace(/^\/?/, '/');
             const opfsHandle: OPFSFileHandle = handle as any;
-            if (!opfsHandle?.dirPath || !opfsHandle.fileName) throw new Error(`Invalid OPFS file handle for "${name}"`);
-            const dirPath = opfsHandle.dirPath.replace(/\/?$/, '/').replace(/^\/?/, '/');
-            fileURL = `${defaultOPFSProtocol}//${dirPath}${opfsHandle.fileName}`;
-            console.log(fileURL);
+            if (!opfsHandle?.filePath) throw new Error(`Invalid OPFS file handle for "${name}"`);
+            const { filePath, domain } = opfsHandle;
+            if (!opfsHandle._url) opfsHandle._url = stringifyOPFSURL(filePath, false, domain);
+            fileURL = opfsHandle._url;
         }
         const [s, d, n] = callSRet(
             this.mod,
@@ -517,9 +518,19 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         }
         dropResponseBuffers(this.mod);
     }
+    
     /** Flush all files */
-    public flushFiles(): void {
+    public flushFiles() {
         this.mod.ccall('duckdb_web_flush_files', null, [], []);
+        const entries = this._runtime._files?.entries();
+        if (!entries) return;
+        for (const [fileName, handle] of entries) {
+            if ((handle as OPFSFileHandle).accessHandle) {
+                if (logWASMCall) console.log(`[WASM-CALL] flushFiles() => flushFile("${fileName}")`);
+                const opfs: OPFSFileHandle = handle;
+                if (opfs.accessHandle) opfs.accessHandle.flush();
+            }
+        }
     }
     /** Write a file to a path */
     public copyFileToPath(name: string, path: string): void {

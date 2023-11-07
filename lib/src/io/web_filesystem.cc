@@ -226,6 +226,8 @@ WebFileSystem::DataProtocol WebFileSystem::inferDataProtocol(std::string_view ur
         proto = WebFileSystem::DataProtocol::HTTP;
     } else if (hasPrefix(url, "s3://")) {
         proto = WebFileSystem::DataProtocol::S3;
+    } else if (hasPrefix(url, "opfs://")) {
+        proto = WebFileSystem::DataProtocol::BROWSER_FSACCESS;
     } else if (hasPrefix(url, "file://")) {
         data_url = std::string_view{url}.substr(7);
         proto = default_data_protocol_;
@@ -981,7 +983,7 @@ bool WebFileSystem::FileExists(const std::string &filename) {
     if (iter != files_by_name_.end()) {
         std::shared_ptr<WebFileSystem::WebFile> file = iter->second;
         dataurl = (file->data_url_.value_or(""));
-        // we have to recheck OPFS files even it is found 
+        // we have to recheck OPFS files even it is found
         // (because the file handle may has flag `emptyAsAbsent`)
         if (file->data_protocol_ != DataProtocol::BROWSER_FSACCESS) return true;
     }
