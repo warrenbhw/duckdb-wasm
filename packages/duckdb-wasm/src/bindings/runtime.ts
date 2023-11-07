@@ -154,6 +154,7 @@ export interface DuckDBRuntime {
 
     syncFile(mod: DuckDBModule, fileId: number): void;
     closeFile(mod: DuckDBModule, fileId: number): void;
+    closeFileByName?(mod: DuckDBModule, fileName: string): boolean;
     getLastFileModificationTime(mod: DuckDBModule, fileId: number): number;
     truncateFile(mod: DuckDBModule, fileId: number, newSize: number): void;
     readFile(mod: DuckDBModule, fileId: number, buffer: number, bytes: number, location: number): number;
@@ -166,13 +167,7 @@ export interface DuckDBRuntime {
     listDirectoryEntries(mod: DuckDBModule, pathPtr: number, pathLen: number): boolean;
     glob(mod: DuckDBModule, pathPtr: number, pathLen: number): void;
     moveFile(mod: DuckDBModule, fromPtr: number, fromLen: number, toPtr: number, toLen: number): void;
-    checkFile(
-        mod: DuckDBModule,
-        pathPtr: number,
-        pathLen: number,
-        urlPtr?: number,
-        urlLen?: number,
-    ): boolean;
+    checkFile(mod: DuckDBModule, pathPtr: number, pathLen: number, urlPtr?: number, urlLen?: number): boolean;
     removeFile(mod: DuckDBModule, pathPtr: number, pathLen: number): void;
 
     // Call a scalar UDF function
@@ -195,6 +190,8 @@ export const DEFAULT_RUNTIME: DuckDBRuntime = {
     openFile: (_mod: DuckDBModule, _fileId: number, flags: FileFlags): void => {},
     syncFile: (_mod: DuckDBModule, _fileId: number): void => {},
     closeFile: (_mod: DuckDBModule, _fileId: number): void => {},
+    closeFileByName: (_mod: DuckDBModule, _fileName: string) => false,
+
     getLastFileModificationTime: (_mod: DuckDBModule, _fileId: number): number => {
         return 0;
     },
