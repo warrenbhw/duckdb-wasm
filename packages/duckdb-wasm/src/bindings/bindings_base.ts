@@ -553,6 +553,12 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         return copy;
     }
 
+    /** Close file (This method is used for explicitly clsoing OPFS file handle) */
+    public closeFile(fileName: string): boolean {
+        const ok = this._runtime.closeFileByName?.(this.mod, fileName);
+        return ok || false;
+    }
+
     /** Enable tracking of file statistics */
     public collectFileStatistics(file: string, enable: boolean): void {
         const [s, d, n] = callSRet(this.mod, 'duckdb_web_collect_file_stats', ['string', 'boolean'], [file, enable]);

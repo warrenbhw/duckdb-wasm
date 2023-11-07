@@ -46,6 +46,7 @@ export interface DuckDBBindings {
     dropFile(name: string): void;
     dropFiles(): void;
     flushFiles(): void;
+    closeFile(name: string): boolean;
     copyFileToPath(name: string, path: string): void;
     copyFileToBuffer(name: string): Uint8Array;
     collectFileStatistics(file: string, enable: boolean): void;
