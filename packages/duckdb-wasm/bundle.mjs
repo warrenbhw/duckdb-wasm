@@ -45,12 +45,24 @@ const EXTERNALS_TEST_BROWSER = ['module'];
 
 // Read CLI flags
 let is_debug = false;
+let enable_blocking = true;
+let enable_coi = true;
+let enable_tests = true;
 let args = process.argv.slice(2);
 if (args.length == 0) {
-    console.warn('Usage: node bundle.mjs {debug/release}');
+    console.warn('Usage: node bundle.mjs [options] {debug/release}');
 } else {
-    if (args[0] == 'debug') is_debug = true;
+    for (const arg of args) {
+        if (arg === '--no-blocking') enable_blocking = false;
+        else if (arg === '--no-coi') enable_coi = false;
+        else if (arg === '--no-tests') enable_tests = false;
+        else if (arg === 'debug') is_debug = true;
+        else if (arg === 'release') is_debug = false;
+        else throw Error(`Unknown arg "${arg}"`);
+    }
 }
+
+const global_define = { 'process.env.KEEP_DEBUG_LOGS': is_debug ? "'1'" : "''" };
 console.log(`DEBUG=${is_debug}`);
 function printErr(err) {
     if (err) return console.log(err);
@@ -80,14 +92,14 @@ patch_arrow();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(__dirname, 'dist');
 mkdir.sync(dist);
-rimraf.sync(`${dist}/*.wasm`);
-rimraf.sync(`${dist}/*.d.ts`);
-rimraf.sync(`${dist}/*.js`);
-rimraf.sync(`${dist}/*.js.map`);
-rimraf.sync(`${dist}/*.mjs`);
-rimraf.sync(`${dist}/*.mjs.map`);
-rimraf.sync(`${dist}/*.cjs`);
-rimraf.sync(`${dist}/*.cjs.map`);
+rimraf.sync(`${dist}/*.wasm`, { glob: true });
+rimraf.sync(`${dist}/*.d.ts`, { glob: true });
+rimraf.sync(`${dist}/*.js`, { glob: true });
+rimraf.sync(`${dist}/*.js.map`, { glob: true });
+rimraf.sync(`${dist}/*.mjs`, { glob: true });
+rimraf.sync(`${dist}/*.mjs.map`, { glob: true });
+rimraf.sync(`${dist}/*.cjs`, { glob: true });
+rimraf.sync(`${dist}/*.cjs.map`, { glob: true });
 
 // -------------------------------
 // Copy WASM files
@@ -112,7 +124,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: true,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     console.log('[ ESBUILD ] duckdb-browser.mjs');
@@ -127,42 +139,46 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: true,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
-    console.log('[ ESBUILD ] duckdb-browser-blocking.cjs');
-    await esbuild.build({
-        entryPoints: ['./src/targets/duckdb-browser-blocking.ts'],
-        outfile: 'dist/duckdb-browser-blocking.cjs',
-        platform: 'browser',
-        format: 'cjs',
-        target: TARGET_BROWSER,
-        bundle: true,
-        minify: true,
-        sourcemap: is_debug ? 'inline' : true,
-        external: EXTERNALS_BROWSER,
-        define: {
-            'process.release.name': '"browser"',
-            'process.env.NODE_ENV': '"production"',
-        },
-    });
+    if (enable_blocking) {
+        console.log('[ ESBUILD ] duckdb-browser-blocking.cjs');
+        await esbuild.build({
+            entryPoints: ['./src/targets/duckdb-browser-blocking.ts'],
+            outfile: 'dist/duckdb-browser-blocking.cjs',
+            platform: 'browser',
+            format: 'cjs',
+            target: TARGET_BROWSER,
+            bundle: true,
+            minify: true,
+            sourcemap: is_debug ? 'inline' : true,
+            external: EXTERNALS_BROWSER,
+            define: {
+                ...global_define,
+                'process.release.name': '"browser"',
+                'process.env.NODE_ENV': '"production"',
+            },
+        });
 
-    console.log('[ ESBUILD ] duckdb-browser-blocking.mjs');
-    await esbuild.build({
-        entryPoints: ['./src/targets/duckdb-browser-blocking.ts'],
-        outfile: 'dist/duckdb-browser-blocking.mjs',
-        platform: 'browser',
-        format: 'esm',
-        target: TARGET_BROWSER,
-        bundle: true,
-        minify: true,
-        sourcemap: is_debug ? 'inline' : true,
-        external: EXTERNALS_BROWSER,
-        define: {
-            'process.release.name': '"browser"',
-            'process.env.NODE_ENV': '"production"',
-        },
-    });
+        console.log('[ ESBUILD ] duckdb-browser-blocking.mjs');
+        await esbuild.build({
+            entryPoints: ['./src/targets/duckdb-browser-blocking.ts'],
+            outfile: 'dist/duckdb-browser-blocking.mjs',
+            platform: 'browser',
+            format: 'esm',
+            target: TARGET_BROWSER,
+            bundle: true,
+            minify: true,
+            sourcemap: is_debug ? 'inline' : true,
+            external: EXTERNALS_BROWSER,
+            define: {
+                ...global_define,
+                'process.release.name': '"browser"',
+                'process.env.NODE_ENV': '"production"',
+            },
+        });
+    }
 
     console.log('[ ESBUILD ] duckdb-browser-mvp.worker.js');
     await esbuild.build({
@@ -176,7 +192,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: true,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     console.log('[ ESBUILD ] duckdb-browser-eh.worker.js');
@@ -191,37 +207,39 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: true,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
-    console.log('[ ESBUILD ] duckdb-browser-coi.worker.js');
-    await esbuild.build({
-        entryPoints: ['./src/targets/duckdb-browser-coi.worker.ts'],
-        outfile: 'dist/duckdb-browser-coi.worker.js',
-        platform: 'browser',
-        format: 'iife',
-        globalName: 'duckdb',
-        target: TARGET_BROWSER,
-        bundle: true,
-        minify: true,
-        sourcemap: is_debug ? 'inline' : true,
-        external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
-    });
+    if (enable_coi) {
+        console.log('[ ESBUILD ] duckdb-browser-coi.worker.js');
+        await esbuild.build({
+            entryPoints: ['./src/targets/duckdb-browser-coi.worker.ts'],
+            outfile: 'dist/duckdb-browser-coi.worker.js',
+            platform: 'browser',
+            format: 'iife',
+            globalName: 'duckdb',
+            target: TARGET_BROWSER,
+            bundle: true,
+            minify: true,
+            sourcemap: is_debug ? 'inline' : true,
+            external: EXTERNALS_WEBWORKER,
+            define: { ...global_define, 'process.release.name': '"browser"' },
+        });
 
-    console.log('[ ESBUILD ] duckdb-browser-coi.pthread.worker.js');
-    await esbuild.build({
-        entryPoints: ['./src/targets/duckdb-browser-coi.pthread.worker.ts'],
-        outfile: 'dist/duckdb-browser-coi.pthread.worker.js',
-        platform: 'browser',
-        format: 'iife',
-        target: TARGET_BROWSER,
-        bundle: true,
-        minify: true,
-        sourcemap: is_debug ? 'inline' : true,
-        external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
-    });
+        console.log('[ ESBUILD ] duckdb-browser-coi.pthread.worker.js');
+        await esbuild.build({
+            entryPoints: ['./src/targets/duckdb-browser-coi.pthread.worker.ts'],
+            outfile: 'dist/duckdb-browser-coi.pthread.worker.js',
+            platform: 'browser',
+            format: 'iife',
+            target: TARGET_BROWSER,
+            bundle: true,
+            minify: true,
+            sourcemap: is_debug ? 'inline' : true,
+            external: EXTERNALS_WEBWORKER,
+            define: { ...global_define, 'process.release.name': '"browser"' },
+        });
+    }
 
     // -------------------------------
     // Node bundles
@@ -240,18 +258,20 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         external: EXTERNALS_NODE,
     });
 
-    console.log('[ ESBUILD ] duckdb-node-blocking.cjs');
-    await esbuild.build({
-        entryPoints: ['./src/targets/duckdb-node-blocking.ts'],
-        outfile: 'dist/duckdb-node-blocking.cjs',
-        platform: 'node',
-        format: 'cjs',
-        target: TARGET_NODE,
-        bundle: true,
-        minify: true,
-        sourcemap: is_debug ? 'inline' : true,
-        external: EXTERNALS_NODE,
-    });
+    if (enable_blocking) {
+        console.log('[ ESBUILD ] duckdb-node-blocking.cjs');
+        await esbuild.build({
+            entryPoints: ['./src/targets/duckdb-node-blocking.ts'],
+            outfile: 'dist/duckdb-node-blocking.cjs',
+            platform: 'node',
+            format: 'cjs',
+            target: TARGET_NODE,
+            bundle: true,
+            minify: true,
+            sourcemap: is_debug ? 'inline' : true,
+            external: EXTERNALS_NODE,
+        });
+    }
 
     console.log('[ ESBUILD ] duckdb-node-mvp.worker.cjs');
     await esbuild.build({
@@ -282,32 +302,34 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
     // -------------------------------
     // Test bundles
 
-    console.log('[ ESBUILD ] tests-browser.js');
-    await esbuild.build({
-        entryPoints: ['./test/index_browser.ts'],
-        outfile: 'dist/tests-browser.js',
-        platform: 'browser',
-        format: 'iife',
-        globalName: 'duckdb',
-        target: TARGET_BROWSER_TEST,
-        bundle: true,
-        sourcemap: is_debug ? 'inline' : true,
-        external: EXTERNALS_TEST_BROWSER,
-    });
+    if (enable_tests) {
+        console.log('[ ESBUILD ] tests-browser.js');
+        await esbuild.build({
+            entryPoints: ['./test/index_browser.ts'],
+            outfile: 'dist/tests-browser.js',
+            platform: 'browser',
+            format: 'iife',
+            globalName: 'duckdb',
+            target: TARGET_BROWSER_TEST,
+            bundle: true,
+            sourcemap: is_debug ? 'inline' : true,
+            external: EXTERNALS_TEST_BROWSER,
+        });
 
-    console.log('[ ESBUILD ] tests-node.cjs');
-    await esbuild.build({
-        entryPoints: ['./test/index_node.ts'],
-        outfile: 'dist/tests-node.cjs',
-        platform: 'node',
-        format: 'cjs',
-        target: TARGET_NODE,
-        bundle: true,
-        minify: false,
-        sourcemap: is_debug ? 'inline' : true,
-        // web-worker polyfill needs to be excluded from bundling due to their dynamic require messing with bundled modules
-        external: [...EXTERNALS_NODE, 'web-worker'],
-    });
+        console.log('[ ESBUILD ] tests-node.cjs');
+        await esbuild.build({
+            entryPoints: ['./test/index_node.ts'],
+            outfile: 'dist/tests-node.cjs',
+            platform: 'node',
+            format: 'cjs',
+            target: TARGET_NODE,
+            bundle: true,
+            minify: false,
+            sourcemap: is_debug ? 'inline' : true,
+            // web-worker polyfill needs to be excluded from bundling due to their dynamic require messing with bundled modules
+            external: [...EXTERNALS_NODE, 'web-worker'],
+        });
+    }
 
     // -------------------------------
     // Write declaration files
