@@ -556,7 +556,7 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                     const data = new Uint8Array(bytes);
                     const num = handle.accessHandle.read(data, { at: location });
                     if (logWASMCall) {
-                        const error = bytes !== num ? `ERR!! ${data} != ${num}` : `${num}`;
+                        const error = bytes !== num ? `ERR!! ${bytes} != ${num}` : `${num}`;
                         const header = data.at(0)!.toString(16) + ',' + data.at(1)!.toString(16);
                         console.log(`[WASM-CALL] readFile("${fileName}", ${location}, ${header}) ${error}`);
                     }

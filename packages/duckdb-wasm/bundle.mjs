@@ -65,6 +65,11 @@ if (args.length == 0) {
 
 const global_define = { 'process.env.KEEP_DEBUG_LOGS': is_debug ? "'1'" : "''" };
 console.log(`DEBUG=${is_debug}`);
+if (process.env.KEEP_DEBUG_LOGS === '1') {
+    console.log(`Environment variable KEEP_DEBUG_LOGS forces the retention of debug logs`);
+    global_define['process.env.KEEP_DEBUG_LOGS'] = "'1'";
+}
+
 function printErr(err) {
     if (err) return console.log(err);
 }
