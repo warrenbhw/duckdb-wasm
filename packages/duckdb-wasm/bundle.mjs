@@ -98,14 +98,14 @@ patch_arrow();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(__dirname, 'dist');
 mkdir.sync(dist);
-rimraf.sync(`${dist}/*.wasm`, { glob: true });
-rimraf.sync(`${dist}/*.d.ts`, { glob: true });
-rimraf.sync(`${dist}/*.js`, { glob: true });
-rimraf.sync(`${dist}/*.js.map`, { glob: true });
-rimraf.sync(`${dist}/*.mjs`, { glob: true });
-rimraf.sync(`${dist}/*.mjs.map`, { glob: true });
-rimraf.sync(`${dist}/*.cjs`, { glob: true });
-rimraf.sync(`${dist}/*.cjs.map`, { glob: true });
+rimrafSync(`${dist}/*.wasm`, { glob: true });
+rimrafSync(`${dist}/*.d.ts`, { glob: true });
+rimrafSync(`${dist}/*.js`, { glob: true });
+rimrafSync(`${dist}/*.js.map`, { glob: true });
+rimrafSync(`${dist}/*.mjs`, { glob: true });
+rimrafSync(`${dist}/*.mjs.map`, { glob: true });
+rimrafSync(`${dist}/*.cjs`, { glob: true });
+rimrafSync(`${dist}/*.cjs.map`, { glob: true });
 
 // -------------------------------
 // Copy WASM files
