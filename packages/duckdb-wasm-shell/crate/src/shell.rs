@@ -1,6 +1,6 @@
 use crate::arrow_printer::{pretty_format_batches, UTF8_BORDERS_NO_HORIZONTAL};
 use crate::duckdb::{
-    AsyncDuckDB, AsyncDuckDBConnection, DataProtocol, PACKAGE_NAME, PACKAGE_VERSION, DuckDBConfig,
+    AsyncDuckDB, AsyncDuckDBConnection, DataProtocol, DuckDBConfig, PACKAGE_NAME, PACKAGE_VERSION,
 };
 use crate::key_event::{Key, KeyEvent};
 use crate::platform;
@@ -53,7 +53,7 @@ impl ShellSettings {
     fn default() -> Self {
         Self {
             output: true,
-            timer: true,
+            timer: false,
             webgl: false,
         }
     }
@@ -62,6 +62,13 @@ impl ShellSettings {
 pub enum DatabaseType {
     InMemory,
     RemoteReadOnly,
+}
+
+use std::sync::{Mutex, OnceLock};
+
+fn past_queries() -> &'static Mutex<VecDeque<String>> {
+    static ARRAY: OnceLock<Mutex<VecDeque<String>>> = OnceLock::new();
+    ARRAY.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
 /// The shell is the primary entrypoint for the web shell api.
@@ -176,6 +183,26 @@ impl Shell {
             s.prompt();
             s.focus();
         });
+
+	let q = past_queries().lock().unwrap();
+
+        for entry in &(*q) {
+		let entry_str = entry.to_string();
+
+		Shell::with_mut(|s| {
+			s.input
+			.insert_text(&entry_str);
+			s.input.flush(&s.terminal);
+			});
+		Shell::highlight_input_async().await;
+
+		let input = Shell::with_mut(|s| {
+			s.input_clock += 1;
+			s.input.collect()
+		});
+		Shell::on_sql(entry_str).await;
+        }
+
         Ok(())
     }
 
@@ -821,6 +848,16 @@ impl Shell {
         });
     }
 
+    /// Pass information on init queries
+    pub async fn pass_init_queries(queries: Vec<String>) -> Result<(), js_sys::Error> {
+        let mut h = VecDeque::with_capacity(queries.len());
+        for entry in &queries[0..queries.len()] {
+            h.push_back(entry.clone());
+        }
+        *past_queries().lock().unwrap() = h;
+        Ok(())
+    }
+
     /// Flush output buffer to the terminal
     pub fn flush(&mut self) {
         self.input.flush(&self.terminal);
@@ -851,6 +888,28 @@ impl Shell {
             });
         });
     }
+
+    /// Highlight input text (if sql)
+    async fn highlight_input_async() {
+        let (input, input_clock) = Shell::with_mut(|s| (s.input.collect(), s.input_clock));
+        if input.trim_start().starts_with('.') {
+            return;
+        }
+        let db_ptr = Shell::with(|s| s.db.clone()).unwrap();
+            let db = match db_ptr.read() {
+                Ok(guard) => guard,
+                Err(_) => return,
+            };
+            let tokens = match db.tokenize(&input).await {
+                Ok(t) => t,
+                Err(_) => return,
+            };
+            Shell::with_mut(|s| {
+                s.input.highlight_sql(tokens);
+                s.flush();
+            });
+    }
+
 
     /// Process on-key event
     fn on_key(keyboard_event: web_sys::KeyboardEvent) {

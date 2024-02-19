@@ -825,6 +825,9 @@ arrow::Status WebDB::Open(std::string_view args_json) {
 
         duckdb::DBConfig db_config;
         db_config.file_system = std::move(buffered_fs);
+#ifdef WASM_LOADABLE_EXTENSIONS_UNSIGNED
+        db_config.options.allow_unsigned_extensions = true;
+#endif
         db_config.options.maximum_threads = config_->maximum_threads;
         db_config.options.use_temporary_directory = false;
         db_config.options.access_mode = access_mode;
@@ -832,6 +835,7 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         if (config_->checkpoint_wal_size.has_value())
             db_config.options.checkpoint_wal_size = config_->checkpoint_wal_size.value();
         auto db = std::make_shared<duckdb::DuckDB>(config_->path, &db_config);
+#ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());
         duckdb_web_fts_init(db.get());
 #if defined(DUCKDB_EXCEL_EXTENSION)
@@ -843,6 +847,7 @@ arrow::Status WebDB::Open(std::string_view args_json) {
 #if defined(DUCKDB_DATADOCS_EXTENSION)
         duckdb_web_datadocs_init(db.get());
 #endif
+#endif  // WASM_LOADABLE_EXTENSIONS
         RegisterCustomExtensionOptions(db);
 
         // Reset state that is specific to the old database

@@ -227,6 +227,7 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                             } else {
                                 xhr.open('GET', file.dataUrl!, false);
                             }
+                            xhr.responseType = 'arraybuffer';
                             xhr.setRequestHeader('Range', `bytes=0-0`);
                             xhr.send(null);
                             const contentLength2 = xhr.getResponseHeader('Content-Length');

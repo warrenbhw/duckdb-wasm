@@ -1,9 +1,10 @@
 import esbuild from 'esbuild';
 import fs, { writeFile } from 'fs';
 import path from 'path';
-import rimraf from 'rimraf';
+import { rimrafSync } from 'rimraf';
 import mkdir from 'make-dir';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 // -------------------------------
 // Current bundling strategy
@@ -97,14 +98,14 @@ patch_arrow();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(__dirname, 'dist');
 mkdir.sync(dist);
-rimraf.sync(`${dist}/*.wasm`, { glob: true });
-rimraf.sync(`${dist}/*.d.ts`, { glob: true });
-rimraf.sync(`${dist}/*.js`, { glob: true });
-rimraf.sync(`${dist}/*.js.map`, { glob: true });
-rimraf.sync(`${dist}/*.mjs`, { glob: true });
-rimraf.sync(`${dist}/*.mjs.map`, { glob: true });
-rimraf.sync(`${dist}/*.cjs`, { glob: true });
-rimraf.sync(`${dist}/*.cjs.map`, { glob: true });
+rimrafSync(`${dist}/*.wasm`, { glob: true });
+rimrafSync(`${dist}/*.d.ts`, { glob: true });
+rimrafSync(`${dist}/*.js`, { glob: true });
+rimrafSync(`${dist}/*.js.map`, { glob: true });
+rimrafSync(`${dist}/*.mjs`, { glob: true });
+rimrafSync(`${dist}/*.mjs.map`, { glob: true });
+rimrafSync(`${dist}/*.cjs`, { glob: true });
+rimrafSync(`${dist}/*.cjs.map`, { glob: true });
 
 // -------------------------------
 // Copy WASM files
@@ -115,6 +116,13 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-eh.wasm'), path.resolve(dist, 
 fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist, 'duckdb-coi.wasm'), printErr);
 
 (async () => {
+    // Don't attempt to bundle NodeJS modules in the browser build.
+    console.log('[ ESBUILD ] Patch bindings');
+    patchFile('./src/bindings/duckdb-mvp.js', 'child_process');
+    patchFile('./src/bindings/duckdb-eh.js', 'child_process');
+    patchFile('./src/bindings/duckdb-coi.js', 'child_process');
+    patchFile('./src/bindings/duckdb-coi.pthread.js', 'vm');
+
     // -------------------------------
     // Browser bundles
 
@@ -126,7 +134,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         format: 'cjs',
         target: TARGET_BROWSER,
         bundle: true,
-        minify: true,
+        minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
         define: { ...global_define, 'process.release.name': '"browser"' },
@@ -141,7 +149,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         globalName: 'duckdb',
         target: TARGET_BROWSER,
         bundle: true,
-        minify: true,
+        minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
         define: { ...global_define, 'process.release.name': '"browser"' },
@@ -156,7 +164,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
             format: 'cjs',
             target: TARGET_BROWSER,
             bundle: true,
-            minify: true,
+            minify: !is_debug,
             sourcemap: is_debug ? 'inline' : true,
             external: EXTERNALS_BROWSER,
             define: {
@@ -174,7 +182,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
             format: 'esm',
             target: TARGET_BROWSER,
             bundle: true,
-            minify: true,
+            minify: !is_debug,
             sourcemap: is_debug ? 'inline' : true,
             external: EXTERNALS_BROWSER,
             define: {
@@ -194,7 +202,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         globalName: 'duckdb',
         target: TARGET_BROWSER,
         bundle: true,
-        minify: true,
+        minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
         define: { ...global_define, 'process.release.name': '"browser"' },
@@ -209,7 +217,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         globalName: 'duckdb',
         target: TARGET_BROWSER,
         bundle: true,
-        minify: true,
+        minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
         define: { ...global_define, 'process.release.name': '"browser"' },
@@ -225,7 +233,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
             globalName: 'duckdb',
             target: TARGET_BROWSER,
             bundle: true,
-            minify: true,
+            minify: !is_debug,
             sourcemap: is_debug ? 'inline' : true,
             external: EXTERNALS_WEBWORKER,
             define: { ...global_define, 'process.release.name': '"browser"' },
@@ -239,7 +247,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
             format: 'iife',
             target: TARGET_BROWSER,
             bundle: true,
-            minify: true,
+            minify: !is_debug,
             sourcemap: is_debug ? 'inline' : true,
             external: EXTERNALS_WEBWORKER,
             define: { ...global_define, 'process.release.name': '"browser"' },
@@ -258,7 +266,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         globalName: 'duckdb',
         target: TARGET_NODE,
         bundle: true,
-        minify: true,
+        minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_NODE,
     });
@@ -272,7 +280,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
             format: 'cjs',
             target: TARGET_NODE,
             bundle: true,
-            minify: true,
+            minify: !is_debug,
             sourcemap: is_debug ? 'inline' : true,
             external: EXTERNALS_NODE,
         });
@@ -286,7 +294,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         format: 'cjs',
         target: TARGET_NODE,
         bundle: true,
-        minify: true,
+        minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_NODE,
     });
@@ -299,7 +307,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         format: 'cjs',
         target: TARGET_NODE,
         bundle: true,
-        minify: true,
+        minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_NODE,
     });
@@ -376,3 +384,14 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         console.log(`Patched ${file}`);
     }
 })();
+
+function patchFile(fileName, moduleName) {
+    // Patch file to make sure ESBuild doesn't statically analyse and attempt to load "moduleName"
+    // We replace both single and double-quoted module names. The character capture list complexity
+    // is due to the single quote:
+    // - the sed expression is executed within single quotes
+    // - we have to terminate the quotes
+    // - we have to escape the middle quote
+    const sedCommand = `s/require(["'\\'']${moduleName}["'\\''])/["${moduleName}"].map(require)/g`;
+    execSync(`sed -i.bak '${sedCommand}' ${fileName} && rm ${fileName}.bak`);
+}

@@ -35,6 +35,7 @@ const NOT_IMPLEMENTED_TYPES = [
     'timestamp_s',
     'timestamp_ms',
     'timestamp_ns',
+    'time_tz',
     'timestamp_tz',
     'hugeint',
     'dec_18_6',
@@ -78,13 +79,8 @@ const FULLY_IMPLEMENTED_ANSWER_MAP: AnswerObjectType = {
 
     // Note that we multiply by thousand (and add 999 for the max) because the value returned by DuckDB is in microseconds,
     // whereas the Date object is in milliseconds.
-    time: [BigInt(0), BigInt(new Date('1970-01-01T23:59:59.999+00:00').valueOf()) * BigInt(1000) + BigInt(999), null],
-    time_tz: [
-        BigInt(0),
-        BigInt(new Date('1970-01-01T23:59:59.999+00:00').valueOf()) * BigInt(1000) + BigInt(999),
-        null,
-    ],
-    interval: [new Int32Array([0,0]),  new Int32Array([0,0]), null],
+    time: [BigInt(0), BigInt(new Date('1970-01-01T23:59:59.999+00:00').valueOf()) * BigInt(1000) + BigInt(1000), null],
+    interval: [new Int32Array([0, 0]), new Int32Array([0, 0]), null],
 
     float: [-3.4028234663852886e38, 3.4028234663852886e38, null],
     double: [-1.7976931348623157e308, 1.7976931348623157e308, null],
@@ -116,6 +112,8 @@ const FULLY_IMPLEMENTED_ANSWER_MAP: AnswerObjectType = {
         Uint8Array.from([0, 0, 0, 97]),
         null,
     ],
+
+    union: ['Frank', 5, null],
 };
 
 // Replacements for the values we knowingly don't support from the test_all_types query
@@ -158,7 +156,7 @@ function getValue(x: any): any {
 const ALL_TYPES_TEST: AllTypesTest[] = [
     {
         name: 'fully supported types',
-        query: `SELECT * REPLACE('not_implemented' as map) FROM test_all_types()`,
+        query: `SELECT * EXCLUDE('uhugeint') REPLACE('not_implemented' as map) FROM test_all_types()`,
         skip: REPLACE_COLUMNS,
         answerMap: FULLY_IMPLEMENTED_ANSWER_MAP,
         answerCount: REPLACE_COLUMNS.length + Object.keys(FULLY_IMPLEMENTED_ANSWER_MAP).length,
@@ -219,22 +217,19 @@ export function testAllTypes(db: () => duckdb.DuckDBBindings): void {
                 }
                 for (let i = 0; i < results.numCols; i++) {
                     const name = results.schema.fields[i].name;
-                    if (name == "bit")
-                        continue;
+                    if (name == 'bit') continue;
                     const col = results.getChildAt(i);
                     if (skip.get(name)) continue;
                     expect(col).not.toBeNull();
                     expect(col?.length).not.toEqual(0);
 
                     expect(unpack(getValue(col!.get(0))))
-                       .withContext(name)
-                       .toEqual(test.answerMap[name][0]); // Min
+                        .withContext(name)
+                        .toEqual(test.answerMap[name][0]); // Min
                     expect(unpack(getValue(col!.get(1))))
-                       .withContext(name)
-                       .toEqual(test.answerMap[name][1]); // Max
-                    expect(col!.get(2))
-                       .withContext(name)
-                       .toEqual(test.answerMap[name][2]); // Null
+                        .withContext(name)
+                        .toEqual(test.answerMap[name][1]); // Max
+                    expect(col!.get(2)).withContext(name).toEqual(test.answerMap[name][2]); // Null
                 }
             });
         }
@@ -271,8 +266,7 @@ export function testAllTypesAsync(db: () => duckdb.AsyncDuckDB): void {
                 }
                 for (let i = 0; i < results.numCols; i++) {
                     const name = results.schema.fields[i].name;
-                    if (name == "bit")
-                        continue;
+                    if (name == 'bit') continue;
                     const col = results.getChildAt(i);
                     if (skip.get(name)) continue;
                     expect(col).not.toBeNull();

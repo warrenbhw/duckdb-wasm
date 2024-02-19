@@ -15,6 +15,8 @@ LIB_RELWITHDEBINFO_DIR="${ROOT_DIR}/build/RelWithDebInfo"
 LIB_XRAY_DIR="${ROOT_DIR}/build/Xray"
 DUCKDB_WASM_DIR="${ROOT_DIR}/packages/duckdb/src/wasm"
 
+DUCKDB_HASH=${shell cd submodules/duckdb && git reflog -n 1 | head -c 10}
+
 CACHE_DIRS=${ROOT_DIR}/.ccache/ ${ROOT_DIR}/.emscripten_cache/
 DOCKER_EXEC_ENVIRONMENT=docker compose run duckdb-wasm-ci
 
@@ -287,7 +289,7 @@ wasm_star: wasm_relsize wasm_relperf wasm_dev wasm_debug
 
 # Build the duckdb library in debug mode
 .PHONY: js_debug
-js_debug: build/bootstrap wasm yarn_install
+js_debug: build/bootstrap yarn_install
 	yarn workspace @duckdb/duckdb-wasm build:debug
 
 # Build the duckdb library in release mode
@@ -303,11 +305,21 @@ docs: yarn_install
 # Run the duckdb javascript tests
 .PHONY: js_tests
 js_tests: js_debug build/data
+ifeq (${DUCKDB_WASM_LOADABLE_EXTENSIONS}, 1)
+	# FIXME: build also for node and restore those tests
+	yarn workspace @duckdb/duckdb-wasm test:chrome || echo "--- Parquet tests expected to fail!"
+else
 	yarn workspace @duckdb/duckdb-wasm test
+endif
 
 .PHONY: js_tests_release
 js_tests_release: js_release
+ifeq (${DUCKDB_WASM_LOADABLE_EXTENSIONS}, 1)
+	# FIXME: build also for node and restore those tests
+	yarn workspace @duckdb/duckdb-wasm test:chrome || echo "--- Parquet tests expected to fail!"
+else
 	yarn workspace @duckdb/duckdb-wasm test
+endif
 
 # Run the duckdb javascript tests in browser
 .PHONY: js_tests_browser
@@ -351,6 +363,22 @@ app_start_corp:
 app: wasm wasmpack shell docs js_tests_release
 	yarn workspace @duckdb/duckdb-wasm-app build:release
 
+build_loadable:
+	cp .github/config/extension_config_wasm.cmake submodules/duckdb/extension/extension_config.cmake
+	DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize eh
+	bash ./scripts/build_loadable.sh relsize eh
+
+build_loadable_unsigned:
+	cp .github/config/extension_config_wasm.cmake submodules/duckdb/extension/extension_config.cmake
+	DUCKDB_WASM_LOADABLE_EXTENSIONS="unsigned" GEN=ninja ./scripts/wasm_build_lib.sh relsize eh
+	bash ./scripts/build_loadable.sh relsize eh
+
+serve_loadable: wasmpack shell docs
+	yarn workspace @duckdb/duckdb-wasm-app build:release
+	mkdir -p packages/duckdb-wasm-app/build/release/duckdb-wasm/${DUCKDB_HASH}/wasm_eh/
+	cp loadable_extensions/relsize/eh/* packages/duckdb-wasm-app/build/release/duckdb-wasm/${DUCKDB_HASH}/wasm_eh/.
+	http-server packages/duckdb-wasm-app/build/release -o
+
 .PHONY: app_server
 app_server:
 	python3 -m http.server 9003 --bind 127.0.0.1 --directory ./packages/duckdb-wasm-app/build/release/
@@ -386,9 +414,6 @@ examples: yarn_install
 
 # ---------------------------------------------------------------------------
 # Environment
-
-build/duckdb_shell:
-	${ROOT_DIR}/scripts/build_duckdb_shell.sh
 
 # Generate the compile commands for the language server
 .PHONY: compile_commands

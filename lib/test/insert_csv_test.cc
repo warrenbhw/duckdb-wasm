@@ -4,7 +4,6 @@
 
 #include "duckdb/common/types/date.hpp"
 #include "duckdb/common/types/timestamp.hpp"
-#include "duckdb/execution/operator/persistent/buffered_csv_reader.hpp"
 #include "duckdb/web/io/ifstream.h"
 #include "duckdb/web/io/memory_filesystem.h"
 #include "duckdb/web/test/config.h"
@@ -113,6 +112,7 @@ static std::vector<CSVInsertTest> CSV_IMPORT_TEST = {
         .options = R"JSON({
             "schema": "main",
             "name": "foo",
+            "header": true,
             "columns": [
                 { "name": "a", "sqlType": "int32" },
                 { "name": "b", "sqlType": "int32" },

@@ -20,6 +20,7 @@ class ShellRuntime {
     database: duckdb.AsyncDuckDB | null;
     history: HistoryStore;
     resizeHandler: (_event: UIEvent) => void;
+    hash: string;
 
     constructor(protected container: HTMLDivElement) {
         this.database = null;
@@ -28,6 +29,7 @@ class ShellRuntime {
             const rect = container.getBoundingClientRect();
             shell.resize(rect.width, rect.height);
         };
+        this.hash = "";
     }
 
     public async pickFiles(this: ShellRuntime): Promise<number> {
@@ -51,6 +53,16 @@ class ShellRuntime {
         return await navigator.clipboard.writeText(value);
     }
     public async pushInputToHistory(this: ShellRuntime, value: string) {
+	const encode = encodeURIComponent(extraswaps(value));
+	if (this.hash === "")
+		this.hash = "queries=v0";
+	this.hash += ",";
+	this.hash += encode;
+	if (window.location.hash.startsWith("#savequeries"))
+		window.location.hash = "savequeries&" + this.hash;
+        const a = document.getElementById("hashencoded");
+	if (a && a instanceof HTMLAnchorElement)
+		a.href= "/#" + this.hash;
         this.history.push(value);
     }
 }
@@ -68,6 +80,24 @@ function formatBytes(value: number): string {
     const exp = (Math.log(value) / Math.log(multiple)) | 0;
     const size = Number((value / Math.pow(multiple, exp)).toFixed(2));
     return `${size} ${exp ? `${k}MGTPEZY`[exp - 1] + suffix : `byte${size !== 1 ? 's' : ''}`}`;
+}
+
+function extraswaps(input: string): string {
+    // As long as this function is symmetrical, all good
+    let res : string = "";
+    for (let i=0; i<input.length; i++) {
+	if (input[i] == ' ')
+		res += '-';
+	else if (input[i] == '-')
+		res += ' ';
+	else if (input[i] == ';')
+		res += '~';
+	else if (input[i] == '~')
+		res += ';';
+	else
+		res += input[i];
+	}
+	return res;
 }
 
 export async function embed(props: ShellProps) {
@@ -116,5 +146,14 @@ export async function embed(props: ShellProps) {
     });
     await step('Attaching Shell', async () => {
         shell.configureDatabase(runtime.database);
+    });
+	const hash = window.location.hash;
+	const splits = hash.split(',');
+	const sqls : Array<string> = [];
+	for (let i=1; i< splits.length; i++) {
+		sqls.push(extraswaps(decodeURIComponent(splits[i])));
+		}
+    await step('Rewinding history!', async () => {
+        shell.passInitQueries(sqls);
     });
 }

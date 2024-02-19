@@ -9,7 +9,6 @@ project(duckdb_wasm VERSION 0.1)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS -std=c++17)
 set(ignoreMe "${DUCKDB_WASM_VERSION}")
 
 # We need to enable this option if we need to implement async operation (E.g., async file system)
@@ -28,8 +27,27 @@ set(ignoreMe "${DUCKDB_WASM_VERSION}")
 # 
 set(ENABLE_EMSCRIPTEN_ASYNCIFY OFF)
 
-if(DUCKDUB_WASM_LOADABLE_EXTENSIONS)
-  set(CMAKE_CXX_FLAGS "-std=c++17 -fPIC -DWASM_LOADABLE_EXTENSIONS=1")
+option(DUCKDB_WASM_LOADABLE_EXTENSIONS "Build with loadable extensions" OFF)
+option(DUCKDB_WASM_LOADABLE_EXTENSIONS_UNSIGNED "Build with loadable extensions" OFF)
+
+if(DEFINED ENV{DUCKDB_WASM_LOADABLE_EXTENSIONS})
+  set(DUCKDB_WASM_LOADABLE_EXTENSIONS ON)
+  if("$ENV{DUCKDB_WASM_LOADABLE_EXTENSIONS}" STREQUAL "unsigned")
+    set(DUCKDB_WASM_LOADABLE_EXTENSIONS_UNSIGNED ON)
+  endif()
+endif()
+
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -DDUCKDB_WASM=1 -DFSST_MUST_ALIGN")
+
+if(DUCKDB_WASM_LOADABLE_EXTENSIONS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWASM_LOADABLE_EXTENSIONS=1 -DDUCKDB_EXTENSION_AUTOLOAD_DEFAULT=1 -fPIC")
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDISABLE_EXTENSION_LOAD=1")
+endif()
+
+if(DUCKDB_WASM_LOADABLE_EXTENSIONS_UNSIGNED)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWASM_LOADABLE_EXTENSIONS_UNSIGNED=1")
 endif()
 
 if(NOT EMSCRIPTEN)
@@ -128,16 +146,11 @@ if(EMSCRIPTEN)
     endif()
   # Debug build
   elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-      --profiling \
-      -gsource-map \
-      --source-map-base=file://${CMAKE_BINARY_DIR}/")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
     set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} \
       -sASSERTIONS=1 \
       -sSAFE_HEAP=1 \
-      -gsource-map \
-      --source-map-base=file://${CMAKE_BINARY_DIR}/ \
-      -sSEPARATE_DWARF_URL=file://${CMAKE_BINARY_DIR}/duckdb.wasm")
+      -g")
     # ... with fast linking
     if(WASM_FAST_LINKING)
       set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${DEFAULT_WASM_OPTIMIZATION_OPT}")
@@ -182,6 +195,12 @@ else()
       "${CMAKE_CXX_FLAGS} -DWEBDB_FAST_EXCEPTIONS=1 -DWEBDB_THREADS=1")
 endif()
 
+if (DUCKDB_WASM_LOADABLE_EXTENSIONS)
+  set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -s MAIN_MODULE=1 -s FILESYSTEM=1 -s ENVIRONMENT='web,node,worker' -s ALLOW_TABLE_GROWTH -lembind")
+else()
+  set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -s FILESYSTEM=0 -s ENVIRONMENT='web,node,worker'")
+endif()
+
 # ---------------------------------------------------------------------------
 # Parallelism
 
@@ -195,7 +214,6 @@ set(CMAKE_BUILD_PARALLEL_LEVEL ${NPROCS})
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH})
 
 include("${CMAKE_SOURCE_DIR}/cmake/duckdb.cmake")
-include("${CMAKE_SOURCE_DIR}/cmake/boost.cmake")
 include("${CMAKE_SOURCE_DIR}/cmake/arrow.cmake")
 include("${CMAKE_SOURCE_DIR}/cmake/benchmark.cmake")
 include("${CMAKE_SOURCE_DIR}/cmake/gflags.cmake")
@@ -275,7 +293,7 @@ add_library(
 add_library(
   duckdb_web_excel
   ${CMAKE_SOURCE_DIR}/src/extensions/excel_extension.cc)
-  
+
 add_library(
   duckdb_web_json
   ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
@@ -334,7 +352,6 @@ if(EMSCRIPTEN)
       LINK_FLAGS
       "${WASM_LINK_FLAGS} \
       -s ALLOW_BLOCKING_ON_MAIN_THREAD=1 \
-      -s ENVIRONMENT='web,node,worker' \
       -s WARN_ON_UNDEFINED_SYMBOLS=0 \
       -s ALLOW_MEMORY_GROWTH=1 \
       -s MAXIMUM_MEMORY=4GB \

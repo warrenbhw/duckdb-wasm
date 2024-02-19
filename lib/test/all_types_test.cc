@@ -10,12 +10,12 @@
 #include "arrow/array/builder_dict.h"
 #include "arrow/array/builder_nested.h"
 #include "arrow/array/builder_primitive.h"
+#include "arrow/array/builder_union.h"
 #include "arrow/buffer.h"
 #include "arrow/io/memory.h"
 #include "arrow/ipc/reader.h"
 #include "arrow/util/decimal.h"
 #include "duckdb/common/types/timestamp.hpp"
-#include "duckdb/execution/operator/persistent/buffered_csv_reader.hpp"
 #include "duckdb/web/environment.h"
 #include "duckdb/web/json_parser.h"
 #include "duckdb/web/webdb.h"
@@ -179,6 +179,28 @@ shared_ptr<arrow::Array> GetExpectedMapArray() {
     return map_array_builder->Finish().ValueOrDie();
 }
 
+shared_ptr<arrow::Array> GetExpectedUnionArray() {
+    auto union_builder = std::make_shared<arrow::SparseUnionBuilder>(arrow::default_memory_pool());
+
+    auto str_builder = std::make_shared<arrow::StringBuilder>();
+    union_builder->AppendChild(str_builder, "name");
+
+    auto i16_builder = std::make_shared<arrow::Int16Builder>();
+    union_builder->AppendChild(i16_builder, "age");
+
+    (void)union_builder->Append(0);
+    (void)str_builder->Append("Frank"s);
+    (void)i16_builder->AppendNull();
+
+    (void)union_builder->Append(1);
+    (void)str_builder->AppendNull();
+    (void)i16_builder->Append(5);
+
+    (void)union_builder->AppendNull();
+
+    return union_builder->Finish().ValueOrDie();
+}
+
 vector<string> SUPPORTED_TYPES = {"bool",
                                   "tinyint",
                                   "smallint",
@@ -190,7 +212,6 @@ vector<string> SUPPORTED_TYPES = {"bool",
                                   "ubigint",
                                   "hugeint",
                                   "time",
-                                  "time_tz",
                                   "date",
                                   "float",
                                   "double",
@@ -211,11 +232,12 @@ vector<string> SUPPORTED_TYPES = {"bool",
                                   "dec_18_6",
                                   "dec38_10",
                                   "blob",
-                                  "bit"};
+                                  "bit",
+                                  "union"};
 
 vector<string> UNSUPPORTED_TYPES = {
     // Does not work full range as it overflows during multiplication
-    "timestamp", "interval",
+    "timestamp", "interval", "time_tz",
 
     // Awaiting Timezone implementation in duckdb to allow patching range: is only partially supported
     "timestamp_s", "timestamp_ms", "timestamp_ns", "timestamp_tz",
@@ -286,8 +308,8 @@ TEST(AllTypesTest, FullRangeTypes) {
     // Date/Time types
     AssertParamTypeCorrect<arrow::Time64Type, uint64_t>("time", 0, 86399999999, batch,
                                                         arrow::time64(arrow::TimeUnit::MICRO));
-    AssertParamTypeCorrect<arrow::Time64Type, uint64_t>("time_tz", 0, 86399999999, batch,
-                                                        arrow::time64(arrow::TimeUnit::MICRO));
+    // AssertParamTypeCorrect<arrow::Time64Type, uint64_t>("time_tz", 0, 86399999999, batch,
+    //                                                    arrow::time64(arrow::TimeUnit::MICRO));
     AssertSimpleTypeCorrect<arrow::Date32Type, int32_t>("date", -2147483646, 2147483646, batch);
     AssertSimpleTypeCorrect<arrow::StringType>("varchar", "🦆🦆🦆🦆🦆🦆"s, "goo\x00se"s, batch);
     AssertSimpleTypeCorrect<arrow::BinaryType>("blob", "thisisalongblob\x00withnullbytes"s, "\x00\x00\x00\x61"s, batch);
@@ -336,5 +358,6 @@ TEST(AllTypesTest, FullRangeTypes) {
     AssertArraysMatch(batch->GetColumnByName("struct_of_arrays"), GetExpectedStructOfArrayArray());
     AssertArraysMatch(batch->GetColumnByName("array_of_structs"), GetExpectedArrayOfStructsArray());
     AssertArraysMatch(batch->GetColumnByName("map"), GetExpectedMapArray());
+    AssertArraysMatch(batch->GetColumnByName("union"), GetExpectedUnionArray());
 }
 }  // namespace

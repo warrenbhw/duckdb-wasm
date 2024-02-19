@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@latest/dist/img/duckdb_wasm.svg" height="80">
+  <img src="https://raw.githubusercontent.com/duckdb/duckdb-wasm/main/misc/duckdb_wasm.svg" height="80">
   <h1>DuckDB-Wasm</h1>
 </div>
 
@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/npm/v/@duckdb/duckdb-wasm?logo=npm" alt="duckdb-wasm package on NPM">
   </a>
   <a href="https://github.com/duckdb/duckdb-wasm/actions">
-    <img src="https://github.com/duckdb/duckdb-wasm/actions/workflows/main.yml/badge.svg?branch=master" alt="Github Actions Badge">
+    <img src="https://github.com/duckdb/duckdb-wasm/actions/workflows/main.yml/badge.svg?branch=main" alt="Github Actions Badge">
   </a>
   <a href="https://discord.duckdb.org">
     <img src="https://shields.io/discord/909674491309850675" alt="Join Discord" />

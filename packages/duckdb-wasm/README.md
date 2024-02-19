@@ -1,4 +1,4 @@
-<img src="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@latest/dist/img/duckdb_wasm.svg" height="64">
+<img src="https://raw.githubusercontent.com/duckdb/duckdb-wasm/main/misc/duckdb_wasm.svg" height="64">
 
 [![Main](https://github.com/duckdb/duckdb-wasm/actions/workflows/main.yml/badge.svg)](https://github.com/duckdb/duckdb-wasm/actions/workflows/main.yml)
 [![Benchmarks](https://github.com/duckdb/duckdb-wasm/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/duckdb/duckdb-wasm/actions/workflows/benchmarks.yml)
@@ -129,7 +129,7 @@ await Promise.all(streamInserts);
 // (interchangeable: registerFile{Text,Buffer,URL,Handle})
 await db.registerFileText(`data.csv`, '1|foo\n2|bar\n');
 // ... with typed insert options
-await db.insertCSVFromPath('data.csv', {
+await c.insertCSVFromPath('data.csv', {
     schema: 'main',
     name: 'foo',
     detect: false,
@@ -171,7 +171,7 @@ const myArray = [
 ];
 const encoder = new TextEncoder();
 const buffer = encoder.encode(myArray);
-await db().registerFileBuffer(myTableName, buffer);
+await db.registerFileBuffer(myTableName, buffer);
 await c.insertJSONFromPath(myTableName, {
   schema: 'main',
   name: 'foo',
