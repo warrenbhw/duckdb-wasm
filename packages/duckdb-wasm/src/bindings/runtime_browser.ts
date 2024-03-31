@@ -544,6 +544,7 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                         throw new Error(`No HTML5 file registered with name: ${file.fileName}`);
                     }
                     const sliced = handle!.slice(location, location + bytes);
+                    console.log(`[WASM-CALL] readFile("${file.fileName}", ${location}, ${bytes})`);
                     const data = new Uint8Array(new FileReaderSync().readAsArrayBuffer(sliced));
                     mod.HEAPU8.set(data, buf);
                     return data.byteLength;
@@ -556,9 +557,11 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                     const data = new Uint8Array(bytes);
                     const num = handle.accessHandle.read(data, { at: location });
                     if (logWASMCall) {
-                        const error = bytes !== num ? `ERR!! ${bytes} != ${num}` : `${num}`;
-                        const header = data.at(0)!.toString(16) + ',' + data.at(1)!.toString(16);
-                        console.log(`[WASM-CALL] readFile("${fileName}", ${location}, ${header}) ${error}`);
+                        const header = [data.at(0), data.at(1)]
+                            .filter(it => typeof it === 'number')
+                            .map(it => it!.toString(16))
+                            .join(',');
+                        console.log(`[WASM-CALL] accessHandle.read("${fileName}", ${location}, ${header})`);
                     }
                     mod.HEAPU8.set(data, buf);
                     return num;
