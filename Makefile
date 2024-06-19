@@ -14,6 +14,7 @@ LIB_RELEASE_DIR="${ROOT_DIR}/build/Release"
 LIB_RELWITHDEBINFO_DIR="${ROOT_DIR}/build/RelWithDebInfo"
 LIB_XRAY_DIR="${ROOT_DIR}/build/Xray"
 DUCKDB_WASM_DIR="${ROOT_DIR}/packages/duckdb/src/wasm"
+TARGET=eh
 
 DUCKDB_HASH=${shell cd submodules/duckdb && git reflog -n 1 | head -c 10}
 
@@ -26,7 +27,6 @@ GTEST_FILTER=*
 JS_FILTER=
 
 EXTENSION_CACHE_DIR="${ROOT_DIR}/.ccache/extension"
-EXCEL_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/excel"
 JSON_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/json"
 DATADOCS_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/datadocs"
 
@@ -50,7 +50,7 @@ check_format:
 set_environment:
 	command -v emcc &> /dev/null && EXEC_ENVIRONMENT="" && echo '\033[1m=== Using native mode ===\033[0m' && echo 'Emscripten from' && which emcc || (EXEC_ENVIRONMENT=echo ${DOCKER_EXEC_ENVIRONMENT} && echo '\033[1m === Using docker environment === \033[0m')
 
-build/data: build/duckdb_shell
+build/data:
 	${ROOT_DIR}/scripts/generate_uni.sh
 	${ROOT_DIR}/scripts/generate_tpch_tbl.sh 0.01
 	${ROOT_DIR}/scripts/generate_tpch_tbl.sh 0.1
@@ -225,9 +225,6 @@ wasm_caches: $(DUCKDB_SOURCES)
 	mkdir -p ${EXTENSION_CACHE_DIR}
 	chown -R $(id -u):$(id -g) ${EXTENSION_CACHE_DIR}
 	mkdir -p ${CACHE_DIRS}
-ifeq (${DUCKDB_EXCEL}, 1)
-	touch ${EXCEL_EXTENSION_CACHE_FILE}
-endif
 ifeq (${DUCKDB_JSON}, 1)
 	touch ${JSON_EXTENSION_CACHE_FILE}
 endif
@@ -365,18 +362,21 @@ app: wasm wasmpack shell docs js_tests_release
 
 build_loadable:
 	cp .github/config/extension_config_wasm.cmake submodules/duckdb/extension/extension_config.cmake
-	DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize eh
-	bash ./scripts/build_loadable.sh relsize eh
+	DUCKDB_PLATFORM=wasm_${TARGET} DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize ${TARGET}
 
-build_loadable_unsigned:
-	cp .github/config/extension_config_wasm.cmake submodules/duckdb/extension/extension_config.cmake
-	DUCKDB_WASM_LOADABLE_EXTENSIONS="unsigned" GEN=ninja ./scripts/wasm_build_lib.sh relsize eh
-	bash ./scripts/build_loadable.sh relsize eh
+build_loadable_unsigned: build_loadable
+        # need to propagate the unsigned flag
 
-serve_loadable: wasmpack shell docs
+serve_loadable_base: wasmpack shell docs
 	yarn workspace @duckdb/duckdb-wasm-app build:release
-	mkdir -p packages/duckdb-wasm-app/build/release/duckdb-wasm/${DUCKDB_HASH}/wasm_eh/
-	cp loadable_extensions/relsize/eh/* packages/duckdb-wasm-app/build/release/duckdb-wasm/${DUCKDB_HASH}/wasm_eh/.
+	cp -r build/extension_repository packages/duckdb-wasm-app/build/release/.
+
+.PHONY: serve_local
+serve_local: build_loadable_unsigned serve_loadable_base
+	http-server packages/duckdb-wasm-app/build/release -o "#queries=v0,SET-custom_extension_repository%3D'http%3A%2F%2F127.0.0.1%3A8080%2Fextension_repository'~" -a 127.0.0.1 -p 8080
+
+.PHONY: serve
+serve: build_loadable serve_loadable_base
 	http-server packages/duckdb-wasm-app/build/release -o
 
 .PHONY: app_server
@@ -428,8 +428,10 @@ compile_commands:
 .PHONY: clean
 clean:
 	rm -rf build
+	rm -rf target
 	cd packages/duckdb-wasm-shell && rm -rf node_modules
 	rm -rf packages/duckdb-wasm-app/build
+	rm -rf submodules/duckdb/build
 
 build/docker_ci_image:
 	command -v emcc &> /dev/null || docker compose build
@@ -441,4 +443,5 @@ submodules:
 
 # Build infrastructure and packages required for development
 build/bootstrap: submodules yarn_install
+	mkdir -p build
 	touch build/bootstrap

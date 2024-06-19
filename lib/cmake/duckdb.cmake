@@ -22,6 +22,11 @@ endif()
 # Escape semicolons in DUCKDB_EXTENSIONS before passing to ExternalProject_Add
 string(REPLACE ";" "$<SEMICOLON>" DUCKDB_EXTENSIONS_PACKED "${DUCKDB_EXTENSIONS}")
 
+set(USE_WASM_THREADS FALSE)
+if(DUCKDB_PLATFORM STREQUAL "wasm_threads")
+  set(USE_WASM_THREADS TRUE)
+endif()
+
 ExternalProject_Add(
   duckdb_ep
   SOURCE_DIR "${DUCKDB_CORE_DIR}"
@@ -29,6 +34,7 @@ ExternalProject_Add(
   INSTALL_DIR "${CMAKE_BINARY_DIR}/third_party/duckdb/install"
   CMAKE_ARGS -G${CMAKE_GENERATOR}
              -DCMAKE_CXX_STANDARD=17
+             -DLOCAL_EXTENSION_REPO="../../build/extension_repository"
              -DCMAKE_CXX_FLAGS=${DUCKDB_CXX_FLAGS}
              -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
              -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
@@ -41,6 +47,8 @@ ExternalProject_Add(
              -DBUILD_SHELL=FALSE
              -DBUILD_UNITTESTS=FALSE
              -DDISABLE_BUILTIN_EXTENSIONS=TRUE
+             -DUSE_WASM_THREADS=${USE_WASM_THREADS}
+             -DDUCKDB_EXPLICIT_PLATFORM=${DUCKDB_EXPLICIT_PLATFORM}
   BUILD_BYPRODUCTS
     <INSTALL_DIR>/lib/libduckdb_re2.a
     <INSTALL_DIR>/lib/libduckdb_static.a
@@ -49,6 +57,7 @@ ExternalProject_Add(
     <INSTALL_DIR>/lib/libduckdb_hyperloglog.a
     <INSTALL_DIR>/lib/libduckdb_miniz.a
     <INSTALL_DIR>/lib/libduckdb_mbedtls.a
+    <INSTALL_DIR>/lib/libduckdb_yyjson.a
     <INSTALL_DIR>/lib/libduckdb_pg_query.a
     <INSTALL_DIR>/lib/libduckdb_utf8proc.a
     <INSTALL_DIR>/lib/libduckdb_fastpforlib.a
@@ -85,6 +94,7 @@ target_link_libraries(
   INTERFACE ${install_dir}/lib/libduckdb_hyperloglog.a
   INTERFACE ${install_dir}/lib/libduckdb_miniz.a
   INTERFACE ${install_dir}/lib/libduckdb_mbedtls.a
+  INTERFACE ${install_dir}/lib/libduckdb_yyjson.a
   INTERFACE ${install_dir}/lib/libduckdb_pg_query.a
   INTERFACE ${install_dir}/lib/libduckdb_utf8proc.a
   INTERFACE ${install_dir}/lib/libduckdb_fastpforlib.a
@@ -98,6 +108,7 @@ target_include_directories(
   INTERFACE ${DUCKDB_UTF8PROC_INCLUDE_DIR}
   INTERFACE ${DUCKDB_RE2_INCLUDE_DIR}
   INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/parquet
+  INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/yyjson
   INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/snappy
   INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/miniz
   INTERFACE ${DUCKDB_SOURCE_DIR}/third_party/thrift
@@ -110,10 +121,6 @@ target_include_directories(duckdb_fts INTERFACE ${DUCKDB_SOURCE_DIR}/extension/f
 add_library(duckdb_parquet STATIC IMPORTED)
 set_property(TARGET duckdb_parquet PROPERTY IMPORTED_LOCATION ${install_dir}/lib/libparquet_extension.a)
 target_include_directories(duckdb_parquet INTERFACE ${DUCKDB_SOURCE_DIR}/extension/parquet/include)
-
-add_library(duckdb_excel STATIC IMPORTED)
-set_property(TARGET duckdb_excel PROPERTY IMPORTED_LOCATION ${install_dir}/lib/libexcel_extension.a)
-target_include_directories(duckdb_excel INTERFACE ${DUCKDB_SOURCE_DIR}/extension/excel/include)
 
 add_library(duckdb_json STATIC IMPORTED)
 set_property(TARGET duckdb_json PROPERTY IMPORTED_LOCATION ${install_dir}/lib/libjson_extension.a)
@@ -130,5 +137,4 @@ endif()
 add_dependencies(duckdb duckdb_ep)
 add_dependencies(duckdb_fts duckdb_ep)
 add_dependencies(duckdb_parquet duckdb_ep)
-add_dependencies(duckdb_excel duckdb_ep)
 add_dependencies(duckdb_json duckdb_ep)

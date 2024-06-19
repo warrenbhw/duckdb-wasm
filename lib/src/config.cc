@@ -38,7 +38,7 @@ uint32_t ResolveFeatureFlags() {
 WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
     auto config = WebDBConfig{.path = ":memory:",
                               .access_mode = std::nullopt,
-                              .maximum_threads = 1,
+                              .maximum_threads = (STATIC_WEBDB_FEATURES & (1 << WebDBFeature::THREADS)) ? 4 : 1,
                               .query =
                                   QueryConfig{
                                       .cast_bigint_to_double = std::nullopt,
@@ -49,6 +49,7 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
                               .filesystem =
                                   FileSystemConfig{
                                       .allow_full_http_reads = std::nullopt,
+                                      .reliable_head_requests = std::nullopt,
                                   },
                               .duckdb_config_options =
                                   DuckDBConfigOptions{
@@ -59,7 +60,8 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
                                       .s3_session_token = "",
                                   },
                               .force_checkpoint = false,
-                              .checkpoint_wal_size = 1 << 24};
+                              .checkpoint_wal_size = 1 << 24,
+                              .allow_unsigned_extensions = false};
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(args_json.begin(), args_json.size());
     if (ok) {
@@ -71,6 +73,9 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
         }
         if (doc.HasMember("maximumThreads") && doc["maximumThreads"].IsNumber()) {
             config.maximum_threads = doc["maximumThreads"].GetInt();
+        }
+        if (doc.HasMember("allowUnsignedExtensions") && doc["allowUnsignedExtensions"].IsBool()) {
+            config.allow_unsigned_extensions = doc["allowUnsignedExtensions"].GetBool();
         }
         if (doc.HasMember("query") && doc["query"].IsObject()) {
             auto q = doc["query"].GetObject();
@@ -94,6 +99,9 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
             auto fs = doc["filesystem"].GetObject();
             if (fs.HasMember("allowFullHTTPReads") && fs["allowFullHTTPReads"].IsBool()) {
                 config.filesystem.allow_full_http_reads = fs["allowFullHTTPReads"].GetBool();
+            }
+            if (fs.HasMember("reliableHeadRequests") && fs["reliableHeadRequests"].IsBool()) {
+                config.filesystem.reliable_head_requests = fs["reliableHeadRequests"].GetBool();
             }
         }
         if (doc.HasMember("checkpointWALSize") && doc["checkpointWALSize"].IsNumber()) {
