@@ -28,13 +28,9 @@ set(ignoreMe "${DUCKDB_WASM_VERSION}")
 set(ENABLE_EMSCRIPTEN_ASYNCIFY OFF)
 
 option(DUCKDB_WASM_LOADABLE_EXTENSIONS "Build with loadable extensions" OFF)
-option(DUCKDB_WASM_LOADABLE_EXTENSIONS_UNSIGNED "Build with loadable extensions" OFF)
 
 if(DEFINED ENV{DUCKDB_WASM_LOADABLE_EXTENSIONS})
   set(DUCKDB_WASM_LOADABLE_EXTENSIONS ON)
-  if("$ENV{DUCKDB_WASM_LOADABLE_EXTENSIONS}" STREQUAL "unsigned")
-    set(DUCKDB_WASM_LOADABLE_EXTENSIONS_UNSIGNED ON)
-  endif()
 endif()
 
 
@@ -44,10 +40,6 @@ if(DUCKDB_WASM_LOADABLE_EXTENSIONS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWASM_LOADABLE_EXTENSIONS=1 -DDUCKDB_EXTENSION_AUTOLOAD_DEFAULT=1 -fPIC")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDISABLE_EXTENSION_LOAD=1")
-endif()
-
-if(DUCKDB_WASM_LOADABLE_EXTENSIONS_UNSIGNED)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWASM_LOADABLE_EXTENSIONS_UNSIGNED=1")
 endif()
 
 if(NOT EMSCRIPTEN)
@@ -179,7 +171,7 @@ if(EMSCRIPTEN)
   if(WITH_WASM_THREADS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1 -DWEBDB_THREADS=1")
     set(DUCKDB_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1")
-    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=4")
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=4 -pthread")
     set(DUCKDB_PLATFORM "wasm_threads")
   else()
     set(CMAKE_CXX_FLAGS
@@ -293,10 +285,6 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/extensions/parquet_extension.cc)
 
 add_library(
-  duckdb_web_excel
-  ${CMAKE_SOURCE_DIR}/src/extensions/excel_extension.cc)
-
-add_library(
   duckdb_web_json
   ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
 
@@ -307,15 +295,9 @@ add_library(
 endif()
 
 set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
-set(EXCEL_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/excel")
 set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
 if(ENABLE_DATADOCS_EXTENSION)
 set(DATADOCS_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/datadocs")
-endif()
-set(DUCKDB_WEB_EXCEL "")
-if(EXISTS "${EXCEL_EXTENSION_CACHE_FILE}")
-  set(DUCKDB_WEB_EXCEL "duckdb_web_excel")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_EXCEL_EXTENSION")
 endif()
 set(DUCKDB_WEB_JSON "")
 if(EXISTS "${JSON_EXTENSION_CACHE_FILE}")
@@ -327,10 +309,9 @@ if(ENABLE_DATADOCS_EXTENSION)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_DATADOCS_EXTENSION")
 endif()
 
-target_link_libraries(duckdb_web duckdb duckdb_web_fts duckdb_web_parquet ${DUCKDB_WEB_EXCEL} ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} arrow rapidjson ${THREAD_LIBS})
+target_link_libraries(duckdb_web duckdb duckdb_web_fts duckdb_web_parquet ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} arrow rapidjson ${THREAD_LIBS})
 target_link_libraries(duckdb_web_fts duckdb duckdb_fts)
 target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
-target_link_libraries(duckdb_web_excel duckdb duckdb_excel)
 target_link_libraries(duckdb_web_json duckdb duckdb_json)
 if(ENABLE_DATADOCS_EXTENSION)
   target_link_libraries(duckdb_web_datadocs duckdb duckdb_datadocs)
@@ -404,6 +385,7 @@ if(EMSCRIPTEN)
           _duckdb_web_prepared_send, \
           _duckdb_web_query_fetch_results, \
           _duckdb_web_query_run, \
+          _duckdb_web_query_run_buffer, \
           _duckdb_web_reset, \
           _duckdb_web_tokenize, \
           _duckdb_web_udf_scalar_create \
@@ -440,7 +422,7 @@ if(NOT EMSCRIPTEN)
       ${CMAKE_SOURCE_DIR}/test/webdb_test.cc
       ${CMAKE_SOURCE_DIR}/test/tester.cc)
 
-  set(TEST_LIBS duckdb_web duckdb_web_fts duckdb_web_parquet ${DUCKDB_WEB_EXCEL} ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} gtest gmock gflags ${THREAD_LIBS})
+  set(TEST_LIBS duckdb_web duckdb_web_fts duckdb_web_parquet ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} gtest gmock gflags ${THREAD_LIBS})
 
   add_executable(tester ${TEST_CC})
   target_link_libraries(tester ${TEST_LIBS})
